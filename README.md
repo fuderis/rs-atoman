@@ -13,7 +13,7 @@ Atoman is a Rust library for safe concurrent access to static asynchronous data 
 
 ## Features:
 
-* Global configuration management with file-based persistence (TOML/JSON).
+* Global configuration management with file-based persistence (`TOML/JSON`).
 * Structured logging with async-safe output to files.
 * Feature flags and shared state in async applications.
 * Data is stored in `Arc` for zero-copy access and thread safety.
