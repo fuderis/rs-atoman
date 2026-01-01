@@ -4,8 +4,8 @@ use super::*;
 /// The atomic state
 #[derive(Clone)]
 pub struct State<T: Clone> {
-    rw_lock: Arc<RwLock<Arc<T>>>,
-    arc_swap: Arc<ArcSwapAny<Arc<T>>>,
+    mutex: Arc<Mutex<Arc<T>>>,
+    swap: Arc<ArcSwapAny<Arc<T>>>,
 }
 
 impl<T: Clone> State<T> {
@@ -14,31 +14,31 @@ impl<T: Clone> State<T> {
         let arc_val = Arc::new(value);
         
         Self {
-            rw_lock: Arc::new(RwLock::new(arc_val.clone())),
-            arc_swap: Arc::new(ArcSwapAny::from(arc_val)),
+            mutex: Arc::new(Mutex::new(arc_val.clone())),
+            swap: Arc::new(ArcSwapAny::from(arc_val)),
         }
     }
 
     /// Returns a locked state guard
     pub fn lock(&self) -> StateGuard<'_, T> {
-        let rw_lock = self.rw_lock.write().expect(ERR_MSG);
-        let data = (**rw_lock).clone();
+        let mutex = self.mutex.lock().expect(ERR_MSG);
+        let data = (**mutex).clone();
         
         StateGuard {
-            rw_lock,
-            arc_swap: self.arc_swap.clone(),
+            mutex,
+            swap: self.swap.clone(),
             data,
         }
     }
 
     /// Returns a state value
     pub fn get(&self) -> Arc<T> {
-        self.arc_swap.load_full()
+        self.swap.load_full()
     }
 
     /// Returns a clone of state value
     pub fn get_cloned(&self) -> T {
-        self.arc_swap.load_full().as_ref().clone()
+        self.swap.load_full().as_ref().clone()
     }
 
     /// Sets a new value to state
@@ -48,11 +48,11 @@ impl<T: Clone> State<T> {
 
     /// Writes data directly
     pub fn map(&self, f: impl FnOnce(&mut T)) {
-        let mut rw_lock = self.lock();
-        let mut data = (*rw_lock).clone();
+        let mut mutex = self.lock();
+        let mut data = (*mutex).clone();
 
         f(&mut data);
-        *rw_lock = data;
+        *mutex = data;
     }
 }
 

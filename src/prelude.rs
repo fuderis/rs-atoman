@@ -2,9 +2,7 @@
 
 pub use crate::error::{ StdResult, Result, Error };
 
-pub(crate) use std::sync::{ Arc, };
-pub(crate) use std::sync::{ RwLock, RwLockReadGuard, RwLockWriteGuard };
-pub(crate) use std::sync::atomic::{ AtomicBool, Ordering, };
+pub(crate) use std::sync::{ Arc, Mutex, MutexGuard, atomic::{ AtomicBool, Ordering, } };
 pub(crate) use std::format as fmt;
 pub(crate) use std::fmt::Debug as Debugging;
 pub(crate) use tokio::sync::{ Notify };
