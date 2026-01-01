@@ -23,7 +23,7 @@ Atoman is a Rust library for safe concurrent access to static asynchronous data 
 
 ### Atomic Flag:
 ```rust
-use atomic_state::prelude::*;
+use atoman::prelude::*;
 
 static IS_ACTIVE: Lazy<Flag> = lazy_flag!(false);
 
@@ -42,7 +42,7 @@ async fn main() {
 
 ### Atomic State:
 ```rust
-use atomic_state::prelude::*;
+use atoman::prelude::*;
 
 static CONFIG: Lazy<State<Config>> = lazy_state!(
     Config {
