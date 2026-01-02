@@ -76,7 +76,7 @@ where
     }
 
     /// Saves the config to custom file path
-    pub fn write<P: Into<PathBuf>>(self: &mut Self, file_path: P) -> Result<()> {
+    pub fn write<P: Into<PathBuf>>(&self, file_path: P) -> Result<()> {
         self.path.set(file_path.into());
         let path = self.path.get_cloned();
 
@@ -108,12 +108,12 @@ where
     }
     
     /// Updates the config file
-    pub fn save(&mut self) -> Result<()> {
+    pub fn save(&self) -> Result<()> {
         self.write(&self.path.get_cloned())
     }
 
     /// Updates the struct data from config file
-    pub fn update(&mut self) -> Result<()> {
+    pub fn update(&self) -> Result<()> {
         let cfg = Self::read(self.path.get_cloned())?;
         let arc = cfg.data.get();
         drop(cfg);
