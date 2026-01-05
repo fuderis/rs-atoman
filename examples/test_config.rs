@@ -21,13 +21,13 @@ async fn main() -> Result<()> {
             }
         }
 
-        let cfg = Config::<Person>::new(".test/person.toml")?;
+        let mut cfg = Config::<Person>::new(".test/person.toml")?;
     
-        assert_eq!(cfg.get().name, "Bob");
-        assert_eq!(cfg.get().age, 23);
+        assert_eq!(cfg.name, "Bob");
+        assert_eq!(cfg.age, 23);
 
-        cfg.lock().age = 24;
-        assert_eq!(cfg.get().age, 24);
+        cfg.age = 24;
+        assert_eq!(cfg.age, 24);
     }
 
     Ok(())

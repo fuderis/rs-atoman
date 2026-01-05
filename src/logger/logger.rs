@@ -16,9 +16,9 @@ impl Logger {
     /// Creates a new instance of logger
     fn new() -> Self {
         Self {
-            path: State::new(None),
-            file: State::new(None),
-            cursor: State::new(0),
+            path: State::from(None),
+            file: State::from(None),
+            cursor: State::from(0),
         }
     }
 

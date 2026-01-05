@@ -3,26 +3,16 @@ use std::{ fs, path::PathBuf };
 use serde::{ Serialize, de::DeserializeOwned };
 
 /// The atomic config wrapper
-#[derive(Clone, Default)]
+#[derive(Default, Clone)]
 pub struct Config<T: Default + Debugging + Clone + Serialize + DeserializeOwned + Send + Sync + 'static> {
-    path: State<PathBuf>,
-    data: State<T>,
+    path: PathBuf,
+    data: T,
 }
 
 impl<T> Config<T>
 where
     T: Clone + Default + Debugging + Serialize + DeserializeOwned + Send + Sync + 'static
 {
-    /// Returns the config data
-    pub fn get(&self) -> Arc<T> {
-        self.data.get()
-    }
-
-    /// Locks the config data
-    pub fn lock(&self) -> StateGuard<'_, T> {
-        self.data.lock()
-    }
-    
     /// Reads the config file or creates the default
     pub fn new<P: Into<PathBuf>>(file_path: P) -> Result<Self> {
         let file_path = file_path.into();
@@ -61,8 +51,8 @@ where
         };
 
         Ok(Config {
-            path: State::new(path),
-            data: State::new(data),
+            path,
+            data,
         })
     }
 
@@ -76,50 +66,89 @@ where
     }
 
     /// Saves the config to custom file path
-    pub fn write<P: Into<PathBuf>>(&self, file_path: P) -> Result<()> {
-        self.path.set(file_path.into());
-        let path = self.path.get_cloned();
+    pub fn write<P: Into<PathBuf>>(&mut self, file_path: P) -> Result<()> {
+        self.path = file_path.into();
 
         // serialize to .toml string:
-        let contents = match path.extension()
+        let contents = match self.path.extension()
             .map(|s| s.to_str().unwrap_or("TOML"))
             .unwrap_or("TOML")
             .to_uppercase()
             .as_ref()
         {
             #[cfg(any(feature = "toml-config"))]
-            "TOML" => toml::to_string_pretty(self.data.get().as_ref()).expect("Failed to serialize TOML"),
+            "TOML" => toml::to_string_pretty(&self.data).expect("Failed to serialize TOML"),
 
             #[cfg(any(feature = "json-config"))]
-            "JSON" => serde_json::to_string_pretty(self.data.get().as_ref()).expect("Failed to serialize JSON"),
+            "JSON" => serde_json::to_string_pretty(&self.data).expect("Failed to serialize JSON"),
 
             ext => return Err(Error::ConfigExt(ext.to_owned()).into())
         };
         
         // create dir:
-        if let Some(parent_dir) = path.parent() {
+        if let Some(parent_dir) = self.path.parent() {
             fs::create_dir_all(parent_dir)?;
         }
         
         // write file:
-        fs::write(path, contents)?;
+        fs::write(&self.path, contents)?;
         
         Ok(())
     }
     
     /// Updates the config file
-    pub fn save(&self) -> Result<()> {
-        self.write(&self.path.get_cloned())
+    pub fn save(&mut self) -> Result<()> {
+        self.write(self.path.clone())
     }
 
     /// Updates the struct data from config file
-    pub fn update(&self) -> Result<()> {
-        let cfg = Self::read(self.path.get_cloned())?;
-        let arc = cfg.data.get();
-        drop(cfg);
-
-        self.data.set(Arc::try_unwrap(arc).unwrap());
+    pub fn update(&mut self) -> Result<()> {
+        let cfg = Self::read(&self.path)?;
+        self.data = cfg.data;
 
         Ok(())
+    }
+}
+
+impl<T: Clone + Default + Debugging + Serialize + DeserializeOwned + Send + Sync + 'static> ::std::ops::Deref for Config<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl<T: Clone + Default + Debugging + Serialize + DeserializeOwned + Send + Sync + 'static> ::std::ops::DerefMut for Config<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.data
+    }
+}
+
+impl<T: Clone + Default + Debugging + Serialize + DeserializeOwned + Send + Sync + 'static>  ::std::fmt::Debug for Config<T> {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "{:?}", &self.data)
+    }
+}
+
+impl<T: Clone + Default + std::fmt::Display + Debugging + Serialize + DeserializeOwned + Send + Sync + 'static> ::std::fmt::Display for Config<T> {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "{}", &self.data)
+    }
+}
+
+impl<T: Clone + Default + Debugging + Serialize + DeserializeOwned + Eq + Send + Sync + 'static> ::std::cmp::Eq for Config<T> {}
+
+impl<T: Clone + Default + Debugging + Serialize + DeserializeOwned + PartialEq + Send + Sync + 'static> ::std::cmp::PartialEq for Config<T> {
+    fn eq(&self, other: &Self) -> bool {
+        &self.data == &other.data
+    }
+}
+
+impl<T: Clone + Default + Debugging + Serialize + DeserializeOwned + Send + Sync + 'static> ::std::convert::From<T> for Config<T> {
+    fn from(value: T) -> Self {
+        Self {
+            path: Default::default(),
+            data: value
+        }
     }
 }

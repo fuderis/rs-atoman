@@ -66,7 +66,7 @@ impl<T: Default + Clone> State<T> {
     }
 }
 
-impl<T: Clone + Default> ::std::default::Default for State<T> {
+impl<T: Default + Clone> ::std::default::Default for State<T> {
     fn default() -> Self {
         let this = Self::new();
         this.set(Default::default());
@@ -85,5 +85,11 @@ impl<T: Default + Clone> ::std::convert::From<T> for State<T> {
 impl<T: Default + Clone + Debugging> ::std::fmt::Debug for State<T> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         write!(f, "{:?}", &self.get())
+    }
+}
+
+impl<T: Default + Clone + Displaying> ::std::fmt::Display for State<T> {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "{}", &self.get())
     }
 }
