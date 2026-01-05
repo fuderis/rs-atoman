@@ -1,44 +1,54 @@
 use crate::prelude::*;
 use super::*;
 
-/// The atomic state
+/// The atomic state wrapper
 #[derive(Clone)]
-pub struct State<T: Clone> {
+pub struct StateWrap<T: Default + Clone> {
     mutex: Arc<Mutex<Arc<T>>>,
     swap: Arc<ArcSwapAny<Arc<T>>>,
 }
 
-impl<T: Clone> State<T> {
+/// The atomic state
+pub struct State<T: Default + Clone> {
+    wrap: Lazy<StateWrap<T>>,
+}
+
+impl<T: Default + Clone> State<T> {
     /// Creates a new state
-    pub fn new(value: T) -> Self {
-        let arc_val = Arc::new(value);
-        
+    pub const fn new() -> Self {
         Self {
-            mutex: Arc::new(Mutex::new(arc_val.clone())),
-            swap: Arc::new(ArcSwapAny::from(arc_val)),
+            wrap: Lazy::new(
+                || {
+                    let arc_val = Arc::new(T::default());
+                    StateWrap {
+                        mutex: Arc::new(Mutex::new(arc_val.clone())),
+                        swap: Arc::new(ArcSwapAny::from(arc_val)),
+                    }
+                }
+            )
         }
     }
 
     /// Returns a locked state guard
     pub fn lock(&self) -> StateGuard<'_, T> {
-        let mutex = self.mutex.lock().expect(ERR_MSG);
+        let mutex = self.wrap.mutex.lock().expect(ERR_MSG);
         let data = (**mutex).clone();
         
         StateGuard {
             mutex,
-            swap: self.swap.clone(),
+            swap: self.wrap.swap.clone(),
             data,
         }
     }
 
     /// Returns a state value
     pub fn get(&self) -> Arc<T> {
-        self.swap.load_full()
+        self.wrap.swap.load_full()
     }
 
     /// Returns a clone of state value
     pub fn get_cloned(&self) -> T {
-        self.swap.load_full().as_ref().clone()
+        self.wrap.swap.load_full().as_ref().clone()
     }
 
     /// Sets a new value to state
@@ -58,11 +68,21 @@ impl<T: Clone> State<T> {
 
 impl<T: Clone + Default> ::std::default::Default for State<T> {
     fn default() -> Self {
-        Self::new(Default::default())
+        let this = Self::new();
+        this.set(Default::default());
+        this
     }
 }
 
-impl<T: Clone + Debugging> ::std::fmt::Debug for State<T> {
+impl<T: Default + Clone> ::std::convert::From<T> for State<T> {
+    fn from(value: T) -> Self {
+        let this = Self::new();
+        this.set(value);
+        this
+    }
+}
+
+impl<T: Default + Clone + Debugging> ::std::fmt::Debug for State<T> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         write!(f, "{:?}", &self.get())
     }

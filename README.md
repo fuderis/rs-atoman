@@ -6,7 +6,7 @@
 [crates-io]: https://img.shields.io/badge/crates.io-fc8d62?style=for-the-badge&labelColor=555555&logo=rust
 [docs-rs]: https://img.shields.io/badge/docs.rs-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs
 
-# Atoman
+# Atoman (Atomic State)
 
 Atoman is a Rust library for safe concurrent access to static asynchronous data across your application. It provides atomic flags and state wrappers with async setters, getters, and locking mechanisms, bridging synchronous static variables with async runtimes like Tokio.
 
@@ -25,18 +25,18 @@ Atoman is a Rust library for safe concurrent access to static asynchronous data 
 ```rust
 use atoman::prelude::*;
 
-static IS_ACTIVE: Lazy<Flag> = lazy_flag!(false);
+static IS_ACTIVE: Flag = Flag::new();
 
 #[tokio::main]
 async fn main() {
-    assert_eq!(*IS_ACTIVE, false);
+    assert_eq!(IS_ACTIVE.get(), false);
     assert!(IS_ACTIVE.is_false());
 
     IS_ACTIVE.set(true);
-    assert_eq!(*IS_ACTIVE, true);
+    assert_eq!(IS_ACTIVE.get(), true);
 
     IS_ACTIVE.swap(false).await;
-    assert_eq!(*IS_ACTIVE, false);
+    assert_eq!(IS_ACTIVE.get(), false);
 }
 ```
 
@@ -44,13 +44,9 @@ async fn main() {
 ```rust
 use atoman::prelude::*;
 
-static CONFIG: Lazy<State<Config>> = lazy_state!(
-    Config {
-        count: 0,
-    }
-);
+static CONFIG: State<Config> = State::new();
 
-#[derive(Debug, Clone)]
+#[derive(Default, Clone)]
 pub struct Config {
     pub count: i32,
 }

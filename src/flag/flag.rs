@@ -1,18 +1,27 @@
 use crate::prelude::*;
 
-/// The atomic flag
+/// The atomic flag wrapper
 #[derive(Clone)]
-pub struct Flag {
+pub struct FlagWrap {
     state: Arc<AtomicBool>,
     notify: Arc<Notify>,
 }
 
+/// The atomic flag
+pub struct Flag {
+    wrap: Lazy<FlagWrap>,
+}
+
 impl Flag {
     /// Creates a new flag
-    pub fn new(initial: bool) -> Self {
-        Flag {
-            state: Arc::new(AtomicBool::new(initial)),
-            notify: Arc::new(Notify::new()),
+    pub const fn new() -> Self {
+        Self {
+            wrap: Lazy::new(
+                || FlagWrap {
+                    state: Arc::new(AtomicBool::new(false)),
+                    notify: Arc::new(Notify::new()),
+                }
+            )
         }
     }
 
@@ -28,13 +37,13 @@ impl Flag {
 
     /// Get actual state
     pub fn get(&self) -> bool {
-        self.state.load(Ordering::SeqCst)
+        self.wrap.state.load(Ordering::SeqCst)
     }
 
     /// Set a new state
     pub fn set(&self, value: bool) {
-        self.state.store(value, Ordering::SeqCst);
-        self.notify.notify_waiters();
+        self.wrap.state.store(value, Ordering::SeqCst);
+        self.wrap.notify.notify_waiters();
     }
 
     /// Wait state change
@@ -44,7 +53,7 @@ impl Flag {
                 break;
             }
 
-            self.notify.notified().await;
+            self.wrap.notify.notified().await;
         }
     }
     
@@ -57,7 +66,7 @@ impl Flag {
 
 impl ::std::default::Default for Flag {
     fn default() -> Self {
-        Self::new(false)
+        Self::new()
     }
 }
 
@@ -89,7 +98,9 @@ impl ::std::cmp::PartialEq<bool> for Flag {
 
 impl ::std::convert::From<bool> for Flag {
     fn from(value: bool) -> Self {
-        Self::new(value)
+        let this = Self::new();
+        this.set(value);
+        this
     }
 }
 

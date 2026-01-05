@@ -10,10 +10,7 @@ pub(crate) use tokio::sync::{ Notify };
 pub use once_cell::{ self, sync::Lazy };
 pub use arc_swap::{ ArcSwapAny };
 
-pub use crate::{
-    Flag, State, StateGuard,
-    lazy, lazy_flag, lazy_state,
-};
+pub use crate::{ Flag, State, StateGuard, lazy };
 
 #[cfg(any(feature = "json-config", feature = "toml-config"))]
 pub use crate::config::Config;

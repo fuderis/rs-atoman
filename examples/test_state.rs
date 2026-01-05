@@ -1,12 +1,8 @@
 use atoman::prelude::*;
 
-static CONFIG: Lazy<State<Config>> = lazy_state!(
-    Config {
-        count: 0,
-    }
-);
+static CONFIG: State<Config> = State::new();
 
-#[derive(Debug, Clone)]
+#[derive(Default, Clone)]
 pub struct Config {
     pub count: i32,
 }

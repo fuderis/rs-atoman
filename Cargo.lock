@@ -22,7 +22,7 @@ dependencies = [
 
 [[package]]
 name = "atoman"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "arc-swap",
  "chrono",
@@ -186,9 +186,9 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "macron"
-version = "0.1.12"
+version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "373187a34d48ec6bb9df2c09dfb7f80aa99ca3e9104bd6da18537b58b792dbf7"
+checksum = "439a800ac78c7b6496ec2b64e8e0649217e2a133a1bef60a43c702f90964d6e1"
 dependencies = [
  "macron-impl-display",
  "macron-impl-error",
@@ -435,9 +435,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.48.0"
+version = "1.49.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff360e02eab121e0bc37a2d3b4d4dc622e6eda3a8e5253d5435ecf5bd4c68408"
+checksum = "72a2903cd7736441aac9df9d7688bd0ce48edccaadf181c3b90be801e81d3d86"
 dependencies = [
  "bytes",
  "libc",

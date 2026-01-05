@@ -24,23 +24,7 @@ pub use log::{ self, info, warn, error, debug, trace };
 /// Initializes a static variable by 'once_cell::Lazy'
 #[macro_export]
 macro_rules! lazy {
-    ($e:expr) => {{
-        $crate::Lazy::new(|| { $e })
-    }}
-}
-
-/// Initializes a static 'Flag' by 'once_cell::Lazy'
-#[macro_export]
-macro_rules! lazy_flag {
-    ($e:expr) => {{
-        $crate::Lazy::new(|| $crate::Flag::new($e))
-    }}
-}
-
-/// Initializes a static 'State' by 'once_cell::Lazy'
-#[macro_export]
-macro_rules! lazy_state {
-    ($e:expr) => {{
-        $crate::Lazy::new(|| $crate::State::new($e))
-    }}
+    ($e:expr) => {
+        $crate::Lazy::new(|| $e)
+    }
 }
