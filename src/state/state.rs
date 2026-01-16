@@ -3,17 +3,17 @@ use super::*;
 
 /// The atomic state wrapper
 #[derive(Clone)]
-pub struct StateWrap<T: Default + Clone> {
+pub struct StateWrap<T: Default + Clone + Send + Sync> {
     mutex: Arc<Mutex<Arc<T>>>,
     swap: Arc<ArcSwapAny<Arc<T>>>,
 }
 
 /// The atomic state
-pub struct State<T: Default + Clone> {
+pub struct State<T: Default + Clone + Send + Sync> {
     wrap: Lazy<Arc<StateWrap<T>>>,
 }
 
-impl<T: Default + Clone> State<T> {
+impl<T: Default + Clone + Send + Sync> State<T> {
     /// Creates a new state
     pub const fn new() -> Self {
         Self {
@@ -30,14 +30,11 @@ impl<T: Default + Clone> State<T> {
     }
 
     /// Returns a locked state guard
-    pub fn lock(&self) -> StateGuard<'_, T> {
-        let mutex = self.wrap.mutex.lock().expect(ERR_MSG);
-        let data = (**mutex).clone();
-        
+    pub fn lock(&self) -> StateGuard<T> {
         StateGuard {
-            mutex,
+            mutex: self.wrap.mutex.clone(),
             swap: self.wrap.swap.clone(),
-            data,
+            data: self.get_cloned(),
         }
     }
 
@@ -66,7 +63,7 @@ impl<T: Default + Clone> State<T> {
     }
 }
 
-impl<T: Default + Clone> ::std::default::Default for State<T> {
+impl<T: Default + Clone + Send + Sync> ::std::default::Default for State<T> {
     fn default() -> Self {
         let this = Self::new();
         this.set(Default::default());
@@ -74,7 +71,7 @@ impl<T: Default + Clone> ::std::default::Default for State<T> {
     }
 }
 
-impl<T: Default + Clone> ::std::convert::From<T> for State<T> {
+impl<T: Default + Clone + Send + Sync> ::std::convert::From<T> for State<T> {
     fn from(value: T) -> Self {
         let this = Self::new();
         this.set(value);
@@ -82,13 +79,13 @@ impl<T: Default + Clone> ::std::convert::From<T> for State<T> {
     }
 }
 
-impl<T: Default + Clone + Debugging> ::std::fmt::Debug for State<T> {
+impl<T: Default + Clone + Send + Sync + Debugging> ::std::fmt::Debug for State<T> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         write!(f, "{:?}", &self.get())
     }
 }
 
-impl<T: Default + Clone + Displaying> ::std::fmt::Display for State<T> {
+impl<T: Default + Clone + Send + Sync + Displaying> ::std::fmt::Display for State<T> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         write!(f, "{}", &self.get())
     }
