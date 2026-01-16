@@ -31,6 +31,11 @@ where
         Ok(this)
     }
 
+    /// Returns config file path
+    pub fn get_path(&self) -> &PathBuf {
+        &self.path
+    }
+
     /// Parses the config from a raw text
     pub fn parse<P: Into<PathBuf>>(file_path: P, contents: &str) -> Result<Self> {
         let path = file_path.into();

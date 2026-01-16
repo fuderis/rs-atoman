@@ -9,7 +9,6 @@ static LOGGER: Lazy<Logger> = Lazy::new(|| Logger::new());
 pub struct Logger {
     path: State<Option<PathBuf>>,
     file: State<Option<Arc<File>>>,
-    cursor: State<usize>,
 }
 
 impl Logger {
@@ -18,34 +17,16 @@ impl Logger {
         Self {
             path: State::from(None),
             file: State::from(None),
-            cursor: State::from(0),
         }
     }
 
     /// Returns the current .log file path
     pub fn get_path() -> Option<PathBuf> {
-        LOGGER.path.get_cloned()
+        LOGGER.path.unsafe_get_cloned()
     }
 
-    /// Returns an unreaded log lines
-    pub fn read_logs() -> Result<Option<Vec<String>>> {
-        Ok(match Self::get_path() {
-            Some(path) => {
-                let cursor = LOGGER.cursor.get();
-                let contents = fs::read_to_string(path)?;
-                let lines = contents[*cursor..].lines()
-                    .map(|s| s.to_owned())
-                    .collect::<Vec<_>>();
-
-                LOGGER.cursor.set(contents.len());
-                Some(lines)
-            }
-            _ => None
-        })
-    }
-    
     /// Returns a log lines of current .log file
-    pub fn read_all_logs() -> Result<Option<Vec<String>>> {
+    pub fn read_logs() -> Result<Option<Vec<String>>> {
         Ok(match Self::get_path() {
             Some(path) => {
                 let contents = fs::read_to_string(path)?;
@@ -53,7 +34,6 @@ impl Logger {
                     .map(|s| s.to_owned())
                     .collect::<Vec<_>>();
                 
-                LOGGER.cursor.set(contents.len());
                 Some(lines)
             }
             _ => None
@@ -101,8 +81,8 @@ impl Logger {
             (None, None)
         };
 
-        LOGGER.path.set(path);
-        LOGGER.file.set(file);
+        LOGGER.path.unsafe_set(path);
+        LOGGER.file.unsafe_set(file);
         LOGGER.init_self()
     }
 
@@ -144,7 +124,7 @@ impl log::Log for Logger {
             );
 
             // writing log to file:
-            if let Some(file) = self.file.lock().as_mut() {
+            if let Some(file) = self.file.unsafe_lock().as_mut() {
                 let _ = file.write_all(
                     fmt!(
                         "{dt}Z  {lvl} {msg}\n",

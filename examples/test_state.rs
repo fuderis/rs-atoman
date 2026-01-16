@@ -7,13 +7,14 @@ pub struct Config {
     pub count: i32,
 }
 
-fn main() {
-    CONFIG.set(Config { count: 10, });
-    assert_eq!(CONFIG.get().count, 10);
+#[tokio::main]
+async fn main() {
+    CONFIG.set(Config { count: 10, }).await;
+    assert_eq!(CONFIG.get().await.count, 10);
 
-    CONFIG.map(|cfg| cfg.count = 20);
-    assert_eq!(CONFIG.get().count, 20);
+    CONFIG.map(|cfg| cfg.count = 20).await;
+    assert_eq!(CONFIG.get().await.count, 20);
     
-    CONFIG.lock().count = 30;
-    assert_eq!(CONFIG.get().count, 30);
+    CONFIG.lock().await.count = 30;
+    assert_eq!(CONFIG.get().await.count, 30);
 }

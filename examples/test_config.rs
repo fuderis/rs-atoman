@@ -22,6 +22,7 @@ async fn main() -> Result<()> {
         }
 
         let mut cfg = Config::<Person>::new(".test/person.toml")?;
+        println!("{cfg:?}");
     
         assert_eq!(cfg.name, "Bob");
         assert_eq!(cfg.age, 23);

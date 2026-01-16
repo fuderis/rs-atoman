@@ -9,7 +9,7 @@ pub struct FlagWrap {
 
 /// The atomic flag
 pub struct Flag {
-    wrap: Lazy<FlagWrap>,
+    wrap: Lazy<Arc<FlagWrap>>,
 }
 
 impl Flag {
@@ -17,10 +17,10 @@ impl Flag {
     pub const fn new() -> Self {
         Self {
             wrap: Lazy::new(
-                || FlagWrap {
+                || Arc::new(FlagWrap {
                     state: Arc::new(AtomicBool::new(false)),
                     notify: Arc::new(Notify::new()),
-                }
+                })
             )
         }
     }
