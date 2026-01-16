@@ -10,7 +10,7 @@ pub struct StateWrap<T: Default + Clone> {
 
 /// The atomic state
 pub struct State<T: Default + Clone> {
-    wrap: Lazy<StateWrap<T>>,
+    wrap: Lazy<Arc<StateWrap<T>>>,
 }
 
 impl<T: Default + Clone> State<T> {
@@ -20,10 +20,10 @@ impl<T: Default + Clone> State<T> {
             wrap: Lazy::new(
                 || {
                     let arc_val = Arc::new(T::default());
-                    StateWrap {
+                    Arc::new(StateWrap {
                         mutex: Arc::new(Mutex::new(arc_val.clone())),
                         swap: Arc::new(ArcSwapAny::from(arc_val)),
-                    }
+                    })
                 }
             )
         }
