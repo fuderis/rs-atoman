@@ -6,18 +6,22 @@
 [crates-io]: https://img.shields.io/badge/crates.io-fc8d62?style=for-the-badge&labelColor=555555&logo=rust
 [docs-rs]: https://img.shields.io/badge/docs.rs-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs
 
-# Atoman (Atomic State)
+# Atoman (atomic state, flag and more..)
 
-Atoman is a Rust library for safe concurrent access to static asynchronous data across your application. It provides atomic flags and state wrappers with async setters, getters, and locking mechanisms, bridging synchronous static variables with async runtimes like Tokio.
+Atoman is a Rust library for safe concurrent access to static asynchronous data across your application. 
+It provides atomic flags and state wrappers with async setters, getters, and locking mechanisms, 
+bridging synchronous static variables with async runtimes like Tokio.<br>
 
+It provides blocking methods alongside async APIs, enabling seamless use in both asynchronous (Tokio tasks) 
+and synchronous (threads/blocking code) contexts without deadlocks or runtime conflicts.
 
 ## Features:
 
 * Global configuration management with file-based persistence (`TOML/JSON`).
 * Structured logging with async-safe output to files.
+* Real-time log file tracing using minimal memory stack.
 * Feature flags and shared state in async applications.
 * Data is stored in `Arc` for zero-copy access and thread safety.
-
 
 ## Examples:
 
@@ -29,14 +33,17 @@ static IS_ACTIVE: Flag = Flag::new();
 
 #[tokio::main]
 async fn main() {
-    assert_eq!(IS_ACTIVE.get(), false);
+    assert!(!IS_ACTIVE.get());
     assert!(IS_ACTIVE.is_false());
 
     IS_ACTIVE.set(true);
-    assert_eq!(IS_ACTIVE.get(), true);
+    assert!(IS_ACTIVE.get());
 
     IS_ACTIVE.swap(false).await;
-    assert_eq!(IS_ACTIVE.get(), false);
+    assert!(!IS_ACTIVE.get());
+
+    IS_ACTIVE.blocking_swap(true);
+    assert!(IS_ACTIVE.get());
 }
 ```
 
@@ -55,6 +62,9 @@ pub struct Config {
 async fn main() {
     CONFIG.set(Config { count: 10, }).await;
     assert_eq!(CONFIG.get().await.count, 10);
+
+    CONFIG.blocking_set(Config { count: 15 });
+    assert_eq!(CONFIG.blocking_get().count, 15);
 
     CONFIG.map(|cfg| cfg.count = 20).await;
     assert_eq!(CONFIG.get().await.count, 20);
@@ -106,6 +116,46 @@ async fn main() -> Result<()> {
     Logger::init(".test/logs", 20)?;
         
     info!("Hello, World!");
+
+    Ok(())
+}
+```
+
+### Tracing:
+```rust
+use atoman::{Logger, Trace, info, prelude::*};
+use tokio::time::{Duration, sleep};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    Logger::init(".logs", 20)?;
+    let log_path = Logger::get_path().unwrap();
+
+    // start log file tracing:
+    let trace_handle = tokio::spawn(async move {
+        let mut trace = Trace::open(log_path, Duration::from_millis(50))
+            .await
+            .expect("Failed to open trace");
+
+        let mut count = 0;
+        while count < 10 {
+            if let Some(line) = trace.next_line().await {
+                println!("Traced line: {}", line);
+                count += 1;
+            }
+        }
+    });
+
+    // wait for spawn thread:
+    sleep(Duration::from_millis(100)).await;
+
+    for i in 1..=15 {
+        info!("Test log #{}", i);
+        sleep(Duration::from_millis(100)).await;
+    }
+
+    // waiting trace thread:
+    let _ = trace_handle.await;
 
     Ok(())
 }

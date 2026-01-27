@@ -9,12 +9,15 @@ pub struct Config {
 
 #[tokio::main]
 async fn main() {
-    CONFIG.set(Config { count: 10, }).await;
+    CONFIG.set(Config { count: 10 }).await;
     assert_eq!(CONFIG.get().await.count, 10);
+
+    CONFIG.blocking_set(Config { count: 15 });
+    assert_eq!(CONFIG.blocking_get().count, 15);
 
     CONFIG.map(|cfg| cfg.count = 20).await;
     assert_eq!(CONFIG.get().await.count, 20);
-    
+
     CONFIG.lock().await.count = 30;
     assert_eq!(CONFIG.get().await.count, 30);
 }
