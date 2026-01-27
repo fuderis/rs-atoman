@@ -12,12 +12,13 @@ use tokio::{
 };
 
 /// High-performance async log tracer
+#[derive(Debug, Clone)]
 pub struct Trace {
     path: PathBuf,
     file: Arc<Mutex<File>>,
     stack: Arc<State<VecDeque<String>>>,
     available: Arc<Flag>,
-    _reader_handle: JoinHandle<()>,
+    _reader_handle: Arc<JoinHandle<()>>,
 }
 
 impl Trace {
@@ -79,7 +80,7 @@ impl Trace {
             file,
             stack,
             available,
-            _reader_handle: reader_handle,
+            _reader_handle: Arc::new(reader_handle),
         })
     }
 
