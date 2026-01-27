@@ -1,1 +1,2 @@
-pub mod flag;  pub use flag::{ Flag, FlagWrap };
+pub mod flag;
+pub use flag::{Flag, FlagWrap};

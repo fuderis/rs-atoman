@@ -1,13 +1,13 @@
-use crate::prelude::*;
-use crate::flag::Flag;
 use super::*;
+use crate::flag::Flag;
+use crate::prelude::*;
 
 /// The atomic state wrapper
 #[derive(Clone)]
 pub struct StateWrap<T: Default + Clone + Send + Sync> {
     mutex: Arc<Mutex<Arc<T>>>,
     swap: Arc<ArcSwapAny<Arc<T>>>,
-    lock: Arc<Flag>
+    lock: Arc<Flag>,
 }
 
 /// The atomic state
@@ -19,16 +19,14 @@ impl<T: Default + Clone + Send + Sync> State<T> {
     /// Creates a new state
     pub const fn new() -> Self {
         Self {
-            wrap: Lazy::new(
-                || {
-                    let arc_val = Arc::new(T::default());
-                    Arc::new(StateWrap {
-                        mutex: Arc::new(Mutex::new(arc_val.clone())),
-                        swap: Arc::new(ArcSwapAny::from(arc_val)),
-                        lock: Arc::new(Flag::from(false)),
-                    })
-                }
-            )
+            wrap: Lazy::new(|| {
+                let arc_val = Arc::new(T::default());
+                Arc::new(StateWrap {
+                    mutex: Arc::new(Mutex::new(arc_val.clone())),
+                    swap: Arc::new(ArcSwapAny::from(arc_val)),
+                    lock: Arc::new(Flag::from(false)),
+                })
+            }),
         }
     }
 
@@ -37,16 +35,29 @@ impl<T: Default + Clone + Send + Sync> State<T> {
         self.wrap.lock.is_true()
     }
 
-    /// Waits for unlock state guard 
+    /// Waits for unlock state guard
     pub async fn wait_unlock(&self) {
         while self.is_locked() {
             self.wrap.lock.wait(false).await;
         }
     }
 
+    /// Waits for unlock state guard (with synchronously blocking)
+    pub fn blocking_wait_unlock(&self) {
+        while self.is_locked() {
+            self.wrap.lock.blocking_wait(false);
+        }
+    }
+
     /// Returns a state guard
     pub async fn lock(&self) -> StateGuard<T> {
         self.wait_unlock().await;
+        self.unsafe_lock()
+    }
+
+    /// Returns a state guard (with synchronously blocking)
+    pub fn blocking_lock(&self) -> StateGuard<T> {
+        self.blocking_wait_unlock();
         self.unsafe_lock()
     }
 
@@ -58,7 +69,7 @@ impl<T: Default + Clone + Send + Sync> State<T> {
             mutex: self.wrap.mutex.clone(),
             swap: self.wrap.swap.clone(),
             data: self.unsafe_get_cloned(),
-            lock: self.wrap.lock.clone()
+            lock: self.wrap.lock.clone(),
         }
     }
 
@@ -68,14 +79,26 @@ impl<T: Default + Clone + Send + Sync> State<T> {
         self.unsafe_get()
     }
 
+    /// Returns a state value (with synchronously blocking)
+    pub fn blocking_get(&self) -> Arc<T> {
+        self.blocking_wait_unlock();
+        self.unsafe_get()
+    }
+
     /// Returns a state value (warning: may not contain actual data)
     pub fn unsafe_get(&self) -> Arc<T> {
         self.wrap.swap.load_full()
     }
-     
+
     /// Returns a clone of state value
     pub async fn get_cloned(&self) -> T {
         self.wait_unlock().await;
+        self.unsafe_get_cloned()
+    }
+
+    /// Returns a clone of state value (with synchronously blocking)
+    pub fn blocking_get_cloned(&self) -> T {
+        self.blocking_wait_unlock();
         self.unsafe_get_cloned()
     }
 
@@ -86,30 +109,54 @@ impl<T: Default + Clone + Send + Sync> State<T> {
 
     /// Sets a new value to state
     pub async fn set(&self, value: T) {
-        *self.lock().await = value;
+        self.wait_unlock().await;
+        self.wrap.lock.set(true);
+
+        self.unsafe_set(value);
+        self.wrap.lock.set(false);
+    }
+
+    /// Sets a new value to state (with synchronously blocking)
+    pub fn blocking_set(&self, value: T) {
+        self.blocking_wait_unlock();
+        self.wrap.lock.set(true);
+
+        self.unsafe_set(value);
+        self.wrap.lock.set(false);
     }
 
     /// Sets a new value to state (warning: changes not be saved if one of StateGuard is alive)
     pub fn unsafe_set(&self, value: T) {
-        *self.unsafe_lock() = value;
+        let new_data = Arc::new(value);
+        let mut lock = self.wrap.mutex.lock().unwrap();
+        *lock = new_data.clone();
+        self.wrap.swap.store(new_data);
     }
 
     /// Writes data directly
     pub async fn map(&self, f: impl FnOnce(&mut T)) {
-        let mut mutex = self.lock().await;
-        let mut data = (*mutex).clone();
+        let mut guard = self.lock().await;
+        let mut data = (*guard).clone();
 
         f(&mut data);
-        *mutex = data;
+        *guard = data;
+    }
+
+    /// Writes data directrly (with synchronously blocking)
+    pub fn blocking_map(&self, f: impl FnOnce(&mut T)) {
+        let mut guard = self.blocking_lock();
+        let mut data = (*guard).clone();
+        f(&mut data);
+        *guard = data;
     }
 
     /// Writes data directly (warning: changes not be saved if one of StateGuard is alive)
     pub fn unsafe_map(&self, f: impl FnOnce(&mut T)) {
-        let mut mutex = self.unsafe_lock();
-        let mut data = (*mutex).clone();
+        let mut guard = self.unsafe_lock();
+        let mut data = (*guard).clone();
 
         f(&mut data);
-        *mutex = data;
+        *guard = data;
     }
 }
 

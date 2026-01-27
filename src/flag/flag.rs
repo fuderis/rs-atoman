@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use std::time::{Duration, Instant};
 
 /// The atomic flag wrapper
 #[derive(Clone)]
@@ -16,12 +17,12 @@ impl Flag {
     /// Creates a new flag
     pub const fn new() -> Self {
         Self {
-            wrap: Lazy::new(
-                || Arc::new(FlagWrap {
+            wrap: Lazy::new(|| {
+                Arc::new(FlagWrap {
                     state: Arc::new(AtomicBool::new(false)),
                     notify: Arc::new(Notify::new()),
                 })
-            )
+            }),
         }
     }
 
@@ -46,20 +47,42 @@ impl Flag {
         self.wrap.notify.notify_waiters();
     }
 
-    /// Wait state change
+    /// Wait for state change
     pub async fn wait(&self, value: bool) {
-        loop {
-            if self.get() == value {
-                break;
-            }
-
+        while self.get() != value {
             self.wrap.notify.notified().await;
         }
     }
-    
-    /// Wait & swap state
+
+    /// Wait for state change (with synchronously blocking)
+    pub fn blocking_wait(&self, value: bool) {
+        while self.get() != value {
+            std::thread::yield_now();
+        }
+    }
+
+    /// Wait for state change by interval (with synchronously blocking)
+    pub fn blocking_wait_timeout(&self, value: bool, timeout: Duration) -> bool {
+        let deadline = Instant::now() + timeout;
+
+        while self.get() != value {
+            if Instant::now() > deadline {
+                return false;
+            }
+            std::thread::yield_now();
+        }
+        true
+    }
+
+    /// Wait & swap flag
     pub async fn swap(&self, value: bool) {
         self.wait(!value).await;
+        self.set(value);
+    }
+
+    /// Wait & swap flag (with synchronously blocking)
+    pub fn blocking_swap(&self, value: bool) {
+        self.blocking_wait(!value);
         self.set(value);
     }
 }
@@ -104,6 +127,7 @@ impl ::std::convert::From<bool> for Flag {
     }
 }
 
+#[allow(clippy::from_over_into)]
 impl ::std::convert::Into<bool> for Flag {
     fn into(self) -> bool {
         self.get()

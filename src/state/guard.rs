@@ -1,19 +1,19 @@
-use crate::prelude::*;
-use crate::flag::Flag;
 use super::ERR_MSG;
+use crate::flag::Flag;
+use crate::prelude::*;
 
 /// The atomic state guard
 pub struct StateGuard<T: Clone + Send + Sync> {
     pub(super) mutex: Arc<Mutex<Arc<T>>>,
     pub(super) swap: Arc<ArcSwapAny<Arc<T>>>,
     pub(super) data: T,
-    pub(super) lock: Arc<Flag>
+    pub(super) lock: Arc<Flag>,
 }
 
 impl<T: Clone + Send + Sync> ::std::ops::Drop for StateGuard<T> {
-    fn drop(self: &mut Self) {
+    fn drop(&mut self) {
         let data = Arc::new(self.data.clone());
-        
+
         *self.mutex.lock().expect(ERR_MSG) = data.clone();
         self.swap.store(data);
         self.lock.set(false);
@@ -22,7 +22,7 @@ impl<T: Clone + Send + Sync> ::std::ops::Drop for StateGuard<T> {
 
 impl<T: Clone + Send + Sync> ::std::ops::Deref for StateGuard<T> {
     type Target = T;
-    
+
     fn deref(&self) -> &Self::Target {
         &self.data
     }
