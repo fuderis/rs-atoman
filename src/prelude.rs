@@ -20,7 +20,7 @@ pub use crate::{Flag, State, StateGuard, lazy};
 pub use crate::config::Config;
 
 #[cfg(feature = "logger")]
-pub use crate::{debug, error, info, logger::Logger, trace, warn};
+pub use crate::{Level, debug, error, info, logger::Logger, trace, warn};
 
 #[cfg(feature = "trace")]
 pub use crate::trace::Trace;

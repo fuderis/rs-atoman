@@ -23,7 +23,7 @@ pub mod logger;
 pub use logger::Logger;
 
 #[cfg(feature = "logger")]
-pub use log::{self, debug, error, info, trace, warn};
+pub use log::{self, Level, debug, error, info, trace, warn};
 
 //#[cfg(feature = "trace")]
 pub mod trace;

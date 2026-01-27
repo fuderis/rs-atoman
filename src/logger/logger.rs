@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use chrono::Utc;
+use log::Level;
 use std::{
     fs::{self, File},
     io::Write,
@@ -11,6 +12,7 @@ static LOGGER: Lazy<Logger> = Lazy::new(|| Logger::new());
 
 /// The logger
 pub struct Logger {
+    level: State<Option<Level>>,
     path: State<Option<PathBuf>>,
     file: State<Option<Arc<File>>>,
 }
@@ -19,6 +21,7 @@ impl Logger {
     /// Creates a new instance of logger
     fn new() -> Self {
         Self {
+            level: State::from(Some(Level::Info)),
             path: State::from(None),
             file: State::from(None),
         }
@@ -40,6 +43,16 @@ impl Logger {
             }
             _ => None,
         })
+    }
+
+    /// Returns log level
+    pub fn get_level() -> Level {
+        LOGGER.level.unsafe_get_cloned().unwrap_or(Level::Info)
+    }
+
+    /// Sets minimum log level
+    pub fn set_level(level: Level) {
+        LOGGER.level.unsafe_set(Some(level));
     }
 
     /// Initializes logger
@@ -99,7 +112,7 @@ impl Logger {
 
 impl log::Log for Logger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        metadata.level() <= log::Level::Info
+        metadata.level() <= Self::get_level()
     }
 
     fn log(&self, record: &log::Record) {
@@ -110,20 +123,27 @@ impl log::Log for Logger {
             && &msg != "RedrawEventsCleared emitted without explicit MainEventsCleared"
         {
             let dt = Utc::now().format("%Y-%m-%dT%H:%M:%S%.6f");
-            let color_code = match record.level() {
+            let prefix = match record.level() {
+                log::Level::Info => "  ",
+                log::Level::Warn => "  ",
+                log::Level::Error => " ",
+                log::Level::Debug => " ",
+                log::Level::Trace => " ",
+            };
+            let color = match record.level() {
                 log::Level::Info => "\x1b[32m",  // green
                 log::Level::Warn => "\x1b[33m",  // yellow
                 log::Level::Error => "\x1b[31m", // red
-                _ => "\x1b[0m",                  // default
+                log::Level::Debug => "\x1b[34m", // blue
+                log::Level::Trace => "\x1b[36m", // cyan
             };
-            let reset_code = "\x1b[0m";
+            let reset_color = "\x1b[0m";
 
             // printing log to terminal:
             println!(
-                "{dt}Z  {color}{lvl}{reset} {msg}",
-                color = color_code,
+                "{dt}Z{prefix}{color}{lvl}{reset} {msg}",
                 lvl = record.level(),
-                reset = reset_code,
+                reset = reset_color,
                 msg = record.args()
             );
 
@@ -131,7 +151,7 @@ impl log::Log for Logger {
             if let Some(file) = self.file.unsafe_lock().as_mut() {
                 let _ = file.write_all(
                     fmt!(
-                        "{dt}Z  {lvl} {msg}\n",
+                        "{dt}Z{prefix}{lvl} {msg}\n",
                         lvl = record.level(),
                         msg = record.args()
                     )
