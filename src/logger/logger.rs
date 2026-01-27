@@ -1,6 +1,10 @@
 use crate::prelude::*;
-use std::{ fs::{ self, File }, io::Write, path::PathBuf };
 use chrono::Utc;
+use std::{
+    fs::{self, File},
+    io::Write,
+    path::PathBuf,
+};
 
 /// The logger instance
 static LOGGER: Lazy<Logger> = Lazy::new(|| Logger::new());
@@ -30,27 +34,26 @@ impl Logger {
         Ok(match Self::get_path() {
             Some(path) => {
                 let contents = fs::read_to_string(path)?;
-                let lines = contents.lines()
-                    .map(|s| s.to_owned())
-                    .collect::<Vec<_>>();
-                
+                let lines = contents.lines().map(|s| s.to_owned()).collect::<Vec<_>>();
+
                 Some(lines)
             }
-            _ => None
+            _ => None,
         })
     }
-    
+
     /// Initializes logger
     pub fn init<P: Into<PathBuf>>(logs_dir: P, max_files: usize) -> Result<()> {
         let logs_dir = logs_dir.into();
-        
+
         // write log file:
         let (path, file) = if max_files > 0 {
-            let file_path = logs_dir.join( Utc::now().format("%Y-%m-%d_%H-%M-%S%.6f.log").to_string() );
+            let file_path =
+                logs_dir.join(Utc::now().format("%Y-%m-%d_%H-%M-%S%.6f.log").to_string());
 
             // create logs dir:
             fs::create_dir_all(&logs_dir)?;
-            
+
             // read logs dir:
             let mut log_files: Vec<PathBuf> = fs::read_dir(&logs_dir)?
                 .filter_map(|entry| {
@@ -73,7 +76,7 @@ impl Logger {
                     let _ = fs::remove_file(old_file);
                 }
             }
-            
+
             // create a new file:
             let file = File::create(&file_path)?;
             (Some(file_path), Some(Arc::new(file)))
@@ -101,22 +104,23 @@ impl log::Log for Logger {
 
     fn log(&self, record: &log::Record) {
         let msg = record.args().to_string();
-        
+
         if self.enabled(record.metadata())
-        && &msg != "NewEvents emitted without explicit RedrawEventsCleared"
-        && &msg != "RedrawEventsCleared emitted without explicit MainEventsCleared"
+            && &msg != "NewEvents emitted without explicit RedrawEventsCleared"
+            && &msg != "RedrawEventsCleared emitted without explicit MainEventsCleared"
         {
             let dt = Utc::now().format("%Y-%m-%dT%H:%M:%S%.6f");
             let color_code = match record.level() {
-                log::Level::Info  => "\x1b[32m",   // green
-                log::Level::Warn  => "\x1b[33m",   // yellow
-                log::Level::Error => "\x1b[31m",   // red
-                _ => "\x1b[0m",                    // default
+                log::Level::Info => "\x1b[32m",  // green
+                log::Level::Warn => "\x1b[33m",  // yellow
+                log::Level::Error => "\x1b[31m", // red
+                _ => "\x1b[0m",                  // default
             };
             let reset_code = "\x1b[0m";
 
             // printing log to terminal:
-            println!("{dt}Z  {color}{lvl}{reset} {msg}",
+            println!(
+                "{dt}Z  {color}{lvl}{reset} {msg}",
                 color = color_code,
                 lvl = record.level(),
                 reset = reset_code,
@@ -130,7 +134,8 @@ impl log::Log for Logger {
                         "{dt}Z  {lvl} {msg}\n",
                         lvl = record.level(),
                         msg = record.args()
-                    ).as_bytes()
+                    )
+                    .as_bytes(),
                 );
                 let _ = file.flush();
             }

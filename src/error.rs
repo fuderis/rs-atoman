@@ -1,4 +1,4 @@
-use macron::{ Display, From, Error };
+use macron::{Display, Error, From};
 
 /// Std Result alias
 pub type StdResult<T, E> = std::result::Result<T, E>;
@@ -11,11 +11,19 @@ pub enum Error {
     #[from]
     Io(std::io::Error),
 
-    #[cfg(any(feature = "logger"))]
-    #[from] #[display = "Logger initialize error: {0}"]
+    #[cfg(feature = "logger")]
+    #[from]
+    #[display = "Logger initialize error: {0}"]
     LoggerInit(log::SetLoggerError),
 
     #[cfg(any(feature = "json-config", feature = "toml-config"))]
     #[display = "Unsupported config extension '.{0}'."]
     ConfigExt(String),
+
+    //    #[cfg(feature = "trace")]
+    #[display = "Failed to open file: {0}"]
+    OpenFile(std::io::Error),
+
+    #[display = "Failed to read file: {0}"]
+    ReadFile(std::io::Error),
 }

@@ -1,30 +1,39 @@
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
+#![allow(clippy::module_inception)]
+pub mod error;
 pub mod prelude;
-pub mod error;    pub use error::{ Result, Error };
+pub use error::{Error, Result};
 
-pub mod flag;     pub use flag::Flag;
-pub mod state;    pub use state::{ State, StateGuard };
+pub mod flag;
+pub use flag::Flag;
+pub mod state;
+pub use state::{State, StateGuard};
 
-pub use once_cell::{ self, sync::Lazy };
-pub use arc_swap::{ self, ArcSwap };
+pub use arc_swap::{self, ArcSwap};
+pub use once_cell::{self, sync::Lazy};
 
 #[cfg(any(feature = "json-config", feature = "toml-config"))]
 pub mod config;
 #[cfg(any(feature = "json-config", feature = "toml-config"))]
 pub use config::Config;
 
-#[cfg(any(feature = "logger"))]
+#[cfg(feature = "logger")]
 pub mod logger;
-#[cfg(any(feature = "logger"))]
+#[cfg(feature = "logger")]
 pub use logger::Logger;
 
-#[cfg(any(feature = "logger"))]
-pub use log::{ self, info, warn, error, debug, trace };
+#[cfg(feature = "logger")]
+pub use log::{self, debug, error, info, trace, warn};
+
+//#[cfg(feature = "trace")]
+pub mod trace;
+#[cfg(feature = "trace")]
+pub use trace::Trace;
 
 /// Initializes a static variable by 'once_cell::Lazy'
 #[macro_export]
 macro_rules! lazy {
     ($e:expr) => {
         $crate::Lazy::new(|| $e)
-    }
+    };
 }
