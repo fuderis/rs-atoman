@@ -28,7 +28,14 @@ impl Trace {
     }
 
     /// Opens file and starts background metadata polling task
-    pub async fn open<P: AsRef<Path>>(file_path: P, timeout: Duration) -> Result<Self> {
+    /// * file_path: path to file
+    /// * timeout: file check timeout
+    /// * only_new: true - trace only new data, false - trace old writed content too
+    pub async fn open<P: AsRef<Path>>(
+        file_path: P,
+        timeout: Duration,
+        only_new: bool,
+    ) -> Result<Self> {
         let path = file_path.as_ref().to_path_buf();
         let file = {
             let f = File::open(&file_path).await.map_err(Error::OpenFile)?;
@@ -36,6 +43,22 @@ impl Trace {
         };
         let stack = Arc::new(State::from(VecDeque::with_capacity(5)));
         let available = Arc::new(Flag::from(false));
+
+        // read already existing data:
+        if !only_new {
+            let mut f = file.lock().await;
+            if let Ok(initial_lines) = Self::read_new_lines(&mut f).await {
+                stack.lock().await.extend(initial_lines);
+                if !stack.lock().await.is_empty() {
+                    available.set(true);
+                }
+            }
+        }
+        // or just set cursor to file end:
+        else {
+            let mut f = file.lock().await;
+            f.seek(std::io::SeekFrom::End(0)).await?;
+        }
 
         // clone data for spawn:
         let path_clone = path.clone();

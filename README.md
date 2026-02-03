@@ -129,11 +129,12 @@ use tokio::time::{Duration, sleep};
 #[tokio::main]
 async fn main() -> Result<()> {
     Logger::init(".logs", 20)?;
+    info!("Logger initialized!");
     let log_path = Logger::get_path().unwrap();
 
     // start log file tracing:
     let trace_handle = tokio::spawn(async move {
-        let mut trace = Trace::open(log_path, Duration::from_millis(50))
+        let mut trace = Trace::open(log_path, Duration::from_millis(50), false)
             .await
             .expect("Failed to open trace");
 
