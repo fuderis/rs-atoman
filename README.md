@@ -138,10 +138,24 @@ async fn main() -> Result<()> {
             .await
             .expect("Failed to open trace");
 
+        // fast check (without blocking thread):
+        for _ in 0..5 {
+            if let Some(lines) = trace.check().await {
+                for line in lines {
+                    println!("Traced line: {line}");
+                }
+
+                sleep(Duration::from_millis(120)).await;
+            }
+        }
+
+        // read next lines (with blocking thread):
         let mut count = 0;
-        while count < 10 {
-            if let Some(line) = trace.next_line().await {
-                println!("Traced line: {}", line);
+        while count < 5 {
+            if let Some(lines) = trace.next().await {
+                for line in lines {
+                    println!("Traced line: {line}");
+                }
                 count += 1;
             }
         }

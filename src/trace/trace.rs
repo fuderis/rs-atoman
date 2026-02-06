@@ -107,8 +107,18 @@ impl Trace {
         })
     }
 
+    /// Fast checks for a new line available
+    pub async fn check(&self) -> Option<Vec<String>> {
+        let mut lines = vec![];
+        while let Some(line) = self.stack.lock().await.pop_front() {
+            lines.push(line);
+        }
+
+        if lines.is_empty() { None } else { Some(lines) }
+    }
+
     /// Reads next line from stack (waits until available)
-    pub async fn next_line(&self) -> Option<String> {
+    pub async fn next(&self) -> Option<Vec<String>> {
         loop {
             // wait until new lines are available:
             while self.available.is_false() {
@@ -116,12 +126,17 @@ impl Trace {
             }
 
             // get line from stack:
-            if let Some(line) = self.stack.lock().await.pop_front() {
-                return Some(line);
+            let mut lines = vec![];
+            while let Some(line) = self.stack.lock().await.pop_front() {
+                lines.push(line);
             }
 
             // stack empty - reset flag:
-            self.available.set(false);
+            if lines.is_empty() {
+                self.available.set(false);
+            } else {
+                return Some(lines);
+            }
         }
     }
 
