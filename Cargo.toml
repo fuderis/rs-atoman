@@ -3,7 +3,7 @@ name = "atoman"
 description = "This library provides a static data that can be accessed safely and concurrently from any part of your program"
 keywords = ["atomic", "static", "flag", "state", "config"]
 categories = ["development-tools", "rust-patterns"]
-version = "0.2.4"
+version = "0.2.5"
 license = "MIT"
 authors = ["Bulat Sh. <t.me/fuderis>"]
 repository = "https://github.com/fuderis/rs-atoman"
@@ -17,14 +17,17 @@ macron = { version = "0.1.13", features = ["derive"] }
 tokio = { version = "1.49.0", features = ["full"] }
 serde = { version = "1.0.228", features = ["derive"], optional = true }
 serde_json = { version = "1.0.148", optional = true }
-toml = { version = "0.9.8", optional = true }
+toml = { version = "1.0.0", optional = true }
 log = { version = "0.4.29", optional = true }
 chrono = { version = "0.4.42", optional = true }
+futures = { version = "0.3.31", optional = true }
+bytes = { version = "1.11.1", optional = true }
 
 [features]
-full = ["config", "logger", "trace"]
+full = ["config", "logger", "trace", "stream"]
 config = ["json-config", "toml-config"]
 json-config = ["dep:serde", "dep:serde_json"]
 toml-config = ["dep:serde", "dep:toml"]
 logger = ["dep:log", "dep:chrono"]
 trace = []
+stream = ["dep:futures", "dep:bytes"]

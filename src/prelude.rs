@@ -24,3 +24,10 @@ pub use crate::{Level, debug, error, info, logger::Logger, trace, warn};
 
 #[cfg(feature = "trace")]
 pub use crate::trace::Trace;
+
+#[cfg(feature = "stream")]
+pub use crate::stream::Stream;
+#[cfg(feature = "stream")]
+pub use bytes::Bytes;
+#[cfg(feature = "stream")]
+pub use futures::StreamExt;

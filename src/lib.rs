@@ -25,10 +25,19 @@ pub use logger::Logger;
 #[cfg(feature = "logger")]
 pub use log::{self, Level, debug, error, info, trace, warn};
 
-//#[cfg(feature = "trace")]
+#[cfg(feature = "trace")]
 pub mod trace;
 #[cfg(feature = "trace")]
 pub use trace::Trace;
+
+#[cfg(feature = "stream")]
+pub mod stream;
+#[cfg(feature = "stream")]
+pub use bytes::{self, Bytes};
+#[cfg(feature = "stream")]
+pub use futures::{self, StreamExt};
+#[cfg(feature = "stream")]
+pub use stream::Stream;
 
 /// Initializes a static variable by 'once_cell::Lazy'
 #[macro_export]

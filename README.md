@@ -74,7 +74,7 @@ async fn main() {
 }
 ```
 
-### Config:
+### Config (feature `config`):
 ```rust
 use atoman::prelude::*;
 
@@ -107,7 +107,7 @@ async fn main() -> Result<()> {
 }
 ```
 
-### Logger:
+### Logger (feature `logger`):
 ```rust
 use atoman::prelude::*;
 
@@ -121,7 +121,7 @@ async fn main() -> Result<()> {
 }
 ```
 
-### Tracing:
+### Tracing (feature `trace`):
 ```rust
 use atoman::{Logger, Trace, info, prelude::*};
 use tokio::time::{Duration, sleep};
@@ -173,6 +173,46 @@ async fn main() -> Result<()> {
     let _ = trace_handle.await;
 
     Ok(())
+}
+```
+
+### Stream (feature `stream`):
+```rust
+use atoman::{Stream, StreamExt, Bytes};
+
+/// Handles server page (on Axum framework as example)
+pub async fn test_page(
+    Json(data): Json<JsonValue>,
+) -> impl IntoResponse {
+    let body = Stream::spawn(
+        // spawn page handler:
+        move |st| async move {
+            for i in 0..5 {
+                st.send(Ok(Bytes::from(i.to_string()))).ok()
+            }
+        },
+        // handle response chunks:
+        move |msg| async move {
+            match msg {
+                Ok(bytes) => Ok(bytes),
+                Err(e) => {
+                    error!("{e}");
+                    Ok(Bytes::from(fmt!("[Error]: {e}")))
+                }
+            }
+        },
+    )
+    .await;
+
+    (
+        StatusCode::OK,
+        HeaderMap::from_iter(map!{
+            header::CONTENT_TYPE =>
+            "application/octet-stream".parse().unwrap(),
+        }),
+        Body::from_stream(body),
+    )
+        .into_response()
 }
 ```
 
