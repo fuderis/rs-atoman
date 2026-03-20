@@ -20,10 +20,19 @@ pub enum Error {
     #[display = "Unsupported config extension '.{0}'."]
     ConfigExt(String),
 
-    //    #[cfg(feature = "trace")]
+    #[cfg(feature = "trace")]
     #[display = "Failed to open file: {0}"]
     OpenFile(std::io::Error),
 
+    #[cfg(feature = "trace")]
     #[display = "Failed to read file: {0}"]
     ReadFile(std::io::Error),
+
+    #[cfg(feature = "stream")]
+    #[display = "Unexpected EOF with partial data"]
+    UnexpectedEOF,
+
+    #[cfg(feature = "stream")]
+    #[display = "Stream channel is already closed"]
+    StreamClosed,
 }

@@ -37,7 +37,12 @@ pub use bytes::{self, Bytes};
 #[cfg(feature = "stream")]
 pub use futures::{self, StreamExt};
 #[cfg(feature = "stream")]
-pub use stream::Stream;
+pub use stream::{Stream, StreamReader, StreamSender};
+
+#[cfg(feature = "file")]
+pub mod fs;
+#[cfg(feature = "file")]
+pub use fs::{File, FileKind, Metadata, OpenMode, SeekFrom};
 
 /// Initializes a static variable by 'once_cell::Lazy'
 #[macro_export]

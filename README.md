@@ -184,23 +184,13 @@ use atoman::{Stream, StreamExt, Bytes};
 pub async fn test_page(
     Json(data): Json<JsonValue>,
 ) -> impl IntoResponse {
-    let body = Stream::spawn(
+    let body = Stream::body(
         // spawn page handler:
-        move |st| async move {
+        move |tx| async move {
             for i in 0..5 {
-                st.send(Ok(Bytes::from(i.to_string()))).ok()
+                tx.send(Bytes::from(i.to_string())).ok()
             }
-        },
-        // handle response chunks:
-        move |msg| async move {
-            match msg {
-                Ok(bytes) => Ok(bytes),
-                Err(e) => {
-                    error!("{e}");
-                    Ok(Bytes::from(fmt!("[Error]: {e}")))
-                }
-            }
-        },
+        }
     )
     .await;
 

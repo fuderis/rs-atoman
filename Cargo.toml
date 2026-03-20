@@ -19,15 +19,16 @@ serde = { version = "1.0.228", features = ["derive"], optional = true }
 serde_json = { version = "1.0.148", optional = true }
 toml = { version = "1.0.0", optional = true }
 log = { version = "0.4.29", optional = true }
-chrono = { version = "0.4.42", optional = true }
+chrono = { version = "0.4.42", features = ["serde"], optional = true }
 futures = { version = "0.3.31", optional = true }
 bytes = { version = "1.11.1", optional = true }
 
 [features]
-full = ["config", "logger", "trace", "stream"]
+full = ["config", "logger", "trace", "stream", "file"]
 config = ["json-config", "toml-config"]
 json-config = ["dep:serde", "dep:serde_json"]
 toml-config = ["dep:serde", "dep:toml"]
 logger = ["dep:log", "dep:chrono"]
 trace = []
-stream = ["dep:futures", "dep:bytes"]
+stream = ["dep:futures", "dep:bytes", "dep:serde", "dep:serde_json"]
+file = ["dep:bytes", "dep:chrono", "dep:serde"]

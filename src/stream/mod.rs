@@ -1,56 +1,86 @@
-use crate::prelude::*;
-use bytes::Bytes;
-use tokio::sync::mpsc;
+pub mod reader;
+pub use reader::StreamReader;
+pub mod sender;
+pub use sender::StreamSender;
 
-/// Server stream-response handler
-#[derive(Clone)]
-pub struct Stream {
-    tx: mpsc::UnboundedSender<Result<Bytes>>,
-}
+use crate::prelude::*;
+use futures::{Stream as FuturesStream, StreamExt};
+use serde::de::DeserializeOwned;
+
+/// The stream read/send manager
+pub struct Stream;
 
 impl Stream {
-    /// Spawns stream handler & returns response body
-    pub async fn spawn<H, P, FutH, FutP>(
-        handler: H,
-        processor: P,
-    ) -> impl futures::Stream<Item = Result<Bytes>>
+    /// Creates a typed pair (Internal Channel)
+    pub fn new<T>() -> (StreamSender<T>, StreamReader<T>) {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        (StreamSender::from(tx), StreamReader::from(rx))
+    }
+
+    /// Reads an external byte stream (reqwest) and spawns a worker for parsing in T
+    pub fn read<T, S>(mut source: S) -> StreamReader<T>
     where
-        H: FnOnce(Stream) -> FutH + Send + 'static,
-        FutH: Future<Output = ()> + Send + 'static,
-        P: FnOnce(Result<Bytes>) -> FutP + Clone + Send + 'static,
-        FutP: Future<Output = Result<Bytes>> + Send + 'static,
+        T: DeserializeOwned + Send + 'static,
+        S: FuturesStream<Item = Result<Bytes>> + Send + Unpin + 'static,
     {
-        let (tx, rx) = mpsc::unbounded_channel::<Result<Bytes>>();
+        let (tx, rx) = Stream::new::<T>();
 
-        // spawning handler with sender:
+        // let's create a "sender" that will parse bytes and send them to StreamReader:
         tokio::spawn(async move {
-            handler(Stream { tx }).await;
-        });
+            let mut buffer = Vec::new();
 
-        // creating unfold stream with processor:
-        futures::stream::unfold(rx, move |mut rx| {
-            let processor = processor.clone();
-            async move {
-                match rx.recv().await {
-                    Some(msg) => {
-                        let processed = processor(msg).await;
-                        Some((processed, rx))
+            while let Some(res) = source.next().await {
+                match res {
+                    Ok(bytes) => {
+                        buffer.extend_from_slice(&bytes);
+
+                        // parsing all accumulated complete JSON objects:
+                        let mut de = serde_json::Deserializer::from_slice(&buffer).into_iter::<T>();
+                        let mut offset = 0;
+
+                        while let Some(Ok(item)) = de.next() {
+                            if tx.send(item).is_err() {
+                                return; // the reader is closed, we're exiting
+                            }
+                            offset = de.byte_offset();
+                        }
+                        buffer.drain(..offset);
                     }
-                    _ => None,
+                    Err(e) => {
+                        tx.tx.as_ref().map(|s| s.send(Err(e)));
+                        return;
+                    }
                 }
             }
-        })
+
+            // checking for broken data at the end of the stream:
+            if !buffer.is_empty() {
+                tx.tx
+                    .as_ref()
+                    .map(|s| s.send(Err(Error::UnexpectedEOF.into())));
+            }
+        });
+
+        rx
     }
 
-    /// Sends response chunk into stream
-    pub fn send(&self, data: Result<Bytes>) -> Result<()> {
-        self.tx.send(data).map_err(|_| {
-            std::io::Error::new(std::io::ErrorKind::BrokenPipe, "stream closed").into()
-        })
-    }
+    /// Server stream (HTTP body)
+    pub fn body<H, Fut>(handler: H) -> impl FuturesStream<Item = Result<Bytes>>
+    where
+        H: FnOnce(StreamSender<Bytes>) -> Fut + Send + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Result<Bytes>>();
 
-    /// Returns true if client is disconnected
-    pub fn is_closed(&self) -> bool {
-        self.tx.is_closed()
+        // spawning stream handler:
+        tokio::spawn(async move {
+            handler(StreamSender { tx: Some(tx) }).await;
+        });
+
+        // create the stream body:
+        futures::stream::unfold(
+            rx,
+            |mut rx| async move { rx.recv().await.map(|res| (res, rx)) },
+        )
     }
 }

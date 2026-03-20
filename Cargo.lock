@@ -86,6 +86,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "wasm-bindgen",
  "windows-link",
 ]
@@ -277,9 +278,9 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "macron"
-version = "0.1.13"
+version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "439a800ac78c7b6496ec2b64e8e0649217e2a133a1bef60a43c702f90964d6e1"
+checksum = "198e43a0ea96c50e8aa3a91f8e2df589ae5d3347fd6ea2c006ca1137771491c6"
 dependencies = [
  "macron-impl-display",
  "macron-impl-error",
