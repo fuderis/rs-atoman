@@ -53,8 +53,8 @@ impl Stream {
                 }
             }
 
-            // checking for broken data at the end of the stream:
-            if !buffer.is_empty() {
+            // check if there is anything there besides spaces and line breaks:
+            if !buffer.iter().all(|b| b.is_ascii_whitespace()) {
                 tx.tx
                     .as_ref()
                     .map(|s| s.send(Err(Error::UnexpectedEOF.into())));

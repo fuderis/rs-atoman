@@ -23,7 +23,7 @@ impl<T> StreamReader<T> {
     /// Tries to read following T object (without waiting)
     pub fn try_read(&mut self) -> Option<T> {
         if let Some(ref mut rx) = self.rx {
-            // try_recv возвращает Result<T, TryRecvError>
+            // try_recv returns Result<T, TryRecvError>:
             match rx.try_recv() {
                 Ok(Ok(item)) => Some(item),
                 _ => None,
