@@ -25,7 +25,7 @@ pub use crate::{Level, debug, error, info, logger::Logger, trace, warn};
 pub use crate::trace::Trace;
 
 #[cfg(feature = "stream")]
-pub use crate::stream::Stream;
+pub use crate::stream::{Stream, StreamReader, StreamSender};
 #[cfg(feature = "stream")]
 pub use bytes::Bytes;
 #[cfg(feature = "stream")]
