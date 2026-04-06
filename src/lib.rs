@@ -2,7 +2,7 @@
 #![allow(clippy::module_inception)]
 pub mod error;
 pub mod prelude;
-pub use error::{Error, Result};
+pub use error::Error;
 
 pub mod flag;
 pub use flag::Flag;

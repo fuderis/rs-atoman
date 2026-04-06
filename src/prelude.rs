@@ -1,10 +1,8 @@
 #![allow(unused_imports)]
-
-pub use crate::error::{Error, Result, StdResult};
-
+pub(crate) use crate::error::Error;
+pub(crate) use macron::prelude::*;
 pub(crate) use std::fmt::Debug as Debugging;
 pub(crate) use std::fmt::Display as Displaying;
-pub(crate) use std::format as fmt;
 pub(crate) use std::path::{Path, PathBuf};
 pub(crate) use std::sync::{
     Arc, Mutex, MutexGuard,

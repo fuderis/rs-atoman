@@ -22,7 +22,7 @@ dependencies = [
 
 [[package]]
 name = "atoman"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "arc-swap",
  "bytes",
@@ -278,14 +278,16 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "macron"
-version = "0.1.14"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "198e43a0ea96c50e8aa3a91f8e2df589ae5d3347fd6ea2c006ca1137771491c6"
+checksum = "b93c109e1c617ea746296693477a06ddb0ece032755f2ca1953e061678d0fb5a"
 dependencies = [
  "macron-impl-display",
  "macron-impl-error",
  "macron-impl-from",
  "macron-impl-into",
+ "macron-regex",
+ "macron-str",
 ]
 
 [[package]]
@@ -325,6 +327,23 @@ name = "macron-impl-into"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b10b6f502ff432df11bccd9cabda7febdc3f52c901a64edb4c27df3f2f4b2ff"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "macron-regex"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "055b1d9e7b56b4f45b9a7501532f88b6306e3bf91fcbea8ffb71b3811380f793"
+
+[[package]]
+name = "macron-str"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d354b048a4a2bcf527b6106bcc1fb68145a444b568107f7fb7782b7014195157"
 dependencies = [
  "proc-macro2",
  "quote",
