@@ -16,7 +16,7 @@ pub use flag::Flag;
 pub mod state;
 pub use state::{State, StateGuard};
 
-pub use arc_swap::{self, ArcSwap};
+pub use arc_swap::{self, ArcSwap, ArcSwapAny};
 pub use once_cell::{self, sync::Lazy};
 
 #[cfg(any(feature = "json-config", feature = "toml-config"))]
