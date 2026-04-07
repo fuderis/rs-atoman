@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+pub(crate) use error::Error;
 pub(crate) use macron::prelude::*;
 pub(crate) use std::fmt::Debug as Debugging;
 pub(crate) use std::fmt::Display as Displaying;

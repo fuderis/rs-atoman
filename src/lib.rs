@@ -2,7 +2,6 @@
 #![allow(clippy::module_inception)]
 pub mod error;
 pub mod prelude;
-pub use error::Error;
 
 /// The dynamic error type
 pub type DynError = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -51,7 +50,7 @@ pub mod server;
 #[cfg(feature = "server")]
 pub use axum;
 #[cfg(feature = "server")]
-pub use server::{Response, Result, Server};
+pub use server::{Response, Server};
 
 #[cfg(feature = "file")]
 pub mod file;
