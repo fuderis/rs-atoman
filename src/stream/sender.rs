@@ -17,6 +17,15 @@ impl<T> StreamSender<T> {
         }
     }
 
+    /// Send the error to reader
+    pub fn send_err(&self, e: DynError) -> Result<()> {
+        if let Some(ref tx) = self.tx {
+            tx.send(Err(e)).map_err(|_| Error::StreamClosed.into())
+        } else {
+            Err(Error::StreamClosed.into())
+        }
+    }
+
     /// Closes the sender (the reader is will also be closed)
     pub fn close(&mut self) {
         self.tx.take();

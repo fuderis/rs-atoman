@@ -10,6 +10,8 @@ pub(crate) use std::sync::{
 };
 pub(crate) use tokio::sync::Notify;
 
+pub use crate::{DynError, Result, StdResult};
+
 pub use arc_swap::ArcSwapAny;
 pub use once_cell::{self, sync::Lazy};
 
@@ -30,3 +32,8 @@ pub use crate::stream::{Stream, StreamReader, StreamSender};
 pub use bytes::Bytes;
 #[cfg(feature = "stream")]
 pub use futures::StreamExt;
+
+#[cfg(feature = "server")]
+pub use crate::server::{Response, Server};
+#[cfg(feature = "server")]
+pub use std::net::SocketAddr;

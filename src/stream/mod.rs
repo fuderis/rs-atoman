@@ -17,7 +17,38 @@ impl Stream {
         (StreamSender::from(tx), StreamReader::from(rx))
     }
 
-    /// Reads an external byte stream (reqwest) and spawns a worker for parsing in T
+    /// Server stream in SSE format (Server-Sent Events)
+    pub fn body<H, Fut>(handler: H) -> impl FuturesStream<Item = Result<Bytes>>
+    where
+        H: FnOnce(StreamSender<Bytes>) -> Fut + Send + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Result<Bytes>>();
+
+        tokio::spawn(async move {
+            let sender = StreamSender { tx: Some(tx) };
+            handler(sender).await;
+        });
+
+        // creating a stream that wraps each incoming chunk in the SSE format:
+        futures::stream::unfold(rx, |mut rx| async move {
+            match rx.recv().await {
+                Some(Ok(bytes)) => {
+                    // formatting as SSE: "data: <payload>\n\n"
+                    let mut sse_data = Vec::with_capacity(bytes.len() + 8);
+                    sse_data.extend_from_slice(b"data: ");
+                    sse_data.extend_from_slice(&bytes);
+                    sse_data.extend_from_slice(b"\n\n");
+
+                    Some((Ok(Bytes::from(sse_data)), rx))
+                }
+                Some(Err(e)) => Some((Err(e), rx)),
+                None => None,
+            }
+        })
+    }
+
+    /// Reads an external SSE format stream (Server-Sent Events)
     pub fn read<T, S>(mut source: S) -> StreamReader<T>
     where
         T: DeserializeOwned + Send + 'static,
@@ -25,7 +56,6 @@ impl Stream {
     {
         let (tx, rx) = Stream::new::<T>();
 
-        // let's create a "sender" that will parse bytes and send them to StreamReader:
         tokio::spawn(async move {
             let mut buffer = Vec::new();
 
@@ -34,53 +64,45 @@ impl Stream {
                     Ok(bytes) => {
                         buffer.extend_from_slice(&bytes);
 
-                        // parsing all accumulated complete JSON objects:
-                        let mut de = serde_json::Deserializer::from_slice(&buffer).into_iter::<T>();
-                        let mut offset = 0;
+                        // looking for a separator for the end of the event \n\n:
+                        while let Some(pos) = buffer.windows(2).position(|w| w == b"\n\n") {
+                            // separating the full message (along with \n\n):
+                            let full_message = buffer.drain(..pos + 2).collect::<Vec<u8>>();
 
-                        while let Some(Ok(item)) = de.next() {
-                            if tx.send(item).is_err() {
-                                return; // the reader is closed, we're exiting
+                            // convert it into a string for the convenience of cropping "data: ":
+                            if let Ok(line) = std::str::from_utf8(&full_message) {
+                                let trimmed = line.trim();
+
+                                // we check that this is exactly the data:
+                                if trimmed.starts_with("data:") {
+                                    // cut off "data: " and extra spaces:
+                                    let json_part = &trimmed[5..].trim();
+
+                                    // if it's not an empty ping, deserializing it:
+                                    if !json_part.is_empty() {
+                                        match serde_json::from_str::<T>(json_part) {
+                                            Ok(item) => {
+                                                if tx.send(item).is_err() {
+                                                    return; // reader is closed..
+                                                }
+                                            }
+                                            Err(e) => {
+                                                tx.send_err(e.into()).ok();
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                            offset = de.byte_offset();
                         }
-                        buffer.drain(..offset);
                     }
                     Err(e) => {
-                        tx.tx.as_ref().map(|s| s.send(Err(e)));
+                        tx.send_err(e.into()).ok();
                         return;
                     }
                 }
             }
-
-            // check if there is anything there besides spaces and line breaks:
-            if !buffer.iter().all(|b| b.is_ascii_whitespace()) {
-                tx.tx
-                    .as_ref()
-                    .map(|s| s.send(Err(Error::UnexpectedEOF.into())));
-            }
         });
 
         rx
-    }
-
-    /// Server stream (HTTP body)
-    pub fn body<H, Fut>(handler: H) -> impl FuturesStream<Item = Result<Bytes>>
-    where
-        H: FnOnce(StreamSender<Bytes>) -> Fut + Send + 'static,
-        Fut: Future<Output = ()> + Send + 'static,
-    {
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Result<Bytes>>();
-
-        // spawning stream handler:
-        tokio::spawn(async move {
-            handler(StreamSender { tx: Some(tx) }).await;
-        });
-
-        // create the stream body:
-        futures::stream::unfold(
-            rx,
-            |mut rx| async move { rx.recv().await.map(|res| (res, rx)) },
-        )
     }
 }
