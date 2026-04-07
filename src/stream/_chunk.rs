@@ -1,5 +1,6 @@
 // use crate::prelude::*;
 use bytes::Bytes;
+use serde::Serialize;
 
 /// The stream chunk wrapper
 #[derive(Debug, Clone)]
@@ -12,8 +13,8 @@ impl Chunk {
     }
 
     /// Creates a chunk from string
-    pub fn str<T: AsRef<str>>(s: T) -> Self {
-        Self(Bytes::from(s.as_ref()))
+    pub fn str(s: impl Into<String>) -> Self {
+        Self(Bytes::from(s.into()))
     }
 
     /// Creates a chunk from any structure that can be converted to JSON

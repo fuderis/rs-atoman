@@ -31,7 +31,7 @@ dependencies = [
 
 [[package]]
 name = "atoman"
-version = "0.2.11"
+version = "0.2.12"
 dependencies = [
  "arc-swap",
  "axum",
@@ -453,9 +453,9 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "macron"
-version = "0.1.16"
+version = "0.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b93c109e1c617ea746296693477a06ddb0ece032755f2ca1953e061678d0fb5a"
+checksum = "eb45b25455dcc1ba3784c54746aee41507dc61b54d5c503e2e8c1c9756a9596e"
 dependencies = [
  "macron-impl-display",
  "macron-impl-error",

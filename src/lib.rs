@@ -51,7 +51,7 @@ pub mod server;
 #[cfg(feature = "server")]
 pub use axum;
 #[cfg(feature = "server")]
-pub use server::{Response, Server};
+pub use server::{Response, Result, Server};
 
 #[cfg(feature = "file")]
 pub mod file;
