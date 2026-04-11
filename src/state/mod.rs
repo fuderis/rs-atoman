@@ -56,23 +56,23 @@ impl<T: Default + Clone + Send + Sync> State<T> {
     /// Returns a state guard
     pub async fn lock(&self) -> StateGuard<T> {
         self.wait_unlock().await;
-        self.unsafe_lock()
+        self.dirty_lock()
     }
 
     /// Returns a state guard (with synchronously blocking)
     pub fn blocking_lock(&self) -> StateGuard<T> {
         self.blocking_wait_unlock();
-        self.unsafe_lock()
+        self.dirty_lock()
     }
 
     /// Returns a state guard (warning: changes not be saved if one of StateGuard is alive)
-    pub fn unsafe_lock(&self) -> StateGuard<T> {
+    pub fn dirty_lock(&self) -> StateGuard<T> {
         self.wrap.lock.set(true);
 
         StateGuard {
             mutex: self.wrap.mutex.clone(),
             swap: self.wrap.swap.clone(),
-            data: self.unsafe_get_cloned(),
+            data: self.dirty_get_cloned(),
             lock: self.wrap.lock.clone(),
         }
     }
@@ -80,34 +80,34 @@ impl<T: Default + Clone + Send + Sync> State<T> {
     /// Returns a state value
     pub async fn get(&self) -> Arc<T> {
         self.wait_unlock().await;
-        self.unsafe_get()
+        self.dirty_get()
     }
 
     /// Returns a state value (with synchronously blocking)
     pub fn blocking_get(&self) -> Arc<T> {
         self.blocking_wait_unlock();
-        self.unsafe_get()
+        self.dirty_get()
     }
 
     /// Returns a state value (warning: may not contain actual data)
-    pub fn unsafe_get(&self) -> Arc<T> {
+    pub fn dirty_get(&self) -> Arc<T> {
         self.wrap.swap.load_full()
     }
 
     /// Returns a clone of state value
     pub async fn get_cloned(&self) -> T {
         self.wait_unlock().await;
-        self.unsafe_get_cloned()
+        self.dirty_get_cloned()
     }
 
     /// Returns a clone of state value (with synchronously blocking)
     pub fn blocking_get_cloned(&self) -> T {
         self.blocking_wait_unlock();
-        self.unsafe_get_cloned()
+        self.dirty_get_cloned()
     }
 
     /// Returns a clone of state value (warning: may not contain actual data)
-    pub fn unsafe_get_cloned(&self) -> T {
+    pub fn dirty_get_cloned(&self) -> T {
         self.wrap.swap.load_full().as_ref().clone()
     }
 
@@ -116,7 +116,7 @@ impl<T: Default + Clone + Send + Sync> State<T> {
         self.wait_unlock().await;
         self.wrap.lock.set(true);
 
-        self.unsafe_set(value);
+        self.dirty_set(value);
         self.wrap.lock.set(false);
     }
 
@@ -125,12 +125,12 @@ impl<T: Default + Clone + Send + Sync> State<T> {
         self.blocking_wait_unlock();
         self.wrap.lock.set(true);
 
-        self.unsafe_set(value);
+        self.dirty_set(value);
         self.wrap.lock.set(false);
     }
 
     /// Sets a new value to state (warning: changes not be saved if one of StateGuard is alive)
-    pub fn unsafe_set(&self, value: T) {
+    pub fn dirty_set(&self, value: T) {
         let new_data = Arc::new(value);
         let mut lock = self.wrap.mutex.lock().unwrap();
         *lock = new_data.clone();
@@ -155,8 +155,8 @@ impl<T: Default + Clone + Send + Sync> State<T> {
     }
 
     /// Writes data directly (warning: changes not be saved if one of StateGuard is alive)
-    pub fn unsafe_map(&self, f: impl FnOnce(&mut T)) {
-        let mut guard = self.unsafe_lock();
+    pub fn dirty_map(&self, f: impl FnOnce(&mut T)) {
+        let mut guard = self.dirty_lock();
         let mut data = (*guard).clone();
 
         f(&mut data);
@@ -167,7 +167,7 @@ impl<T: Default + Clone + Send + Sync> State<T> {
 impl<T: Default + Clone + Send + Sync> ::std::default::Default for State<T> {
     fn default() -> Self {
         let this = Self::new();
-        this.unsafe_set(Default::default());
+        this.dirty_set(Default::default());
         this
     }
 }
@@ -175,19 +175,19 @@ impl<T: Default + Clone + Send + Sync> ::std::default::Default for State<T> {
 impl<T: Default + Clone + Send + Sync> ::std::convert::From<T> for State<T> {
     fn from(value: T) -> Self {
         let this = Self::new();
-        this.unsafe_set(value);
+        this.dirty_set(value);
         this
     }
 }
 
 impl<T: Default + Clone + Send + Sync + Debugging> ::std::fmt::Debug for State<T> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "{:?}", &self.unsafe_get())
+        write!(f, "{:?}", &self.dirty_get())
     }
 }
 
 impl<T: Default + Clone + Send + Sync + Displaying> ::std::fmt::Display for State<T> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "{}", &self.unsafe_get())
+        write!(f, "{}", &self.dirty_get())
     }
 }

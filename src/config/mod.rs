@@ -1,6 +1,30 @@
-use crate::prelude::*;
+use crate::{State, prelude::*};
+
+use chrono::{DateTime, Utc};
 use serde::{Serialize, de::DeserializeOwned};
-use std::{fs, path::PathBuf};
+use std::{
+    path::PathBuf,
+    sync::Arc,
+    time::{Duration, Instant},
+};
+use tokio::fs;
+
+/// The config modify metadata
+#[derive(Default, Debug, Clone)]
+struct Modify {
+    modified: Option<DateTime<Utc>>,
+    checked: Option<Instant>,
+}
+
+impl Modify {
+    /// Creates a new Modify instance
+    pub fn now() -> Self {
+        Self {
+            modified: Some(Utc::now()),
+            checked: Some(Instant::now()),
+        }
+    }
+}
 
 /// The atomic config wrapper
 #[derive(Default, Clone)]
@@ -9,6 +33,7 @@ pub struct Config<
 > {
     path: PathBuf,
     data: T,
+    modify: Arc<State<Modify>>,
 }
 
 impl<T> Config<T>
@@ -16,25 +41,25 @@ where
     T: Clone + Default + Debugging + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
     /// Reads the config file or creates the default
-    pub fn new<P: Into<PathBuf>>(file_path: P) -> Result<Self> {
+    pub async fn new<P: Into<PathBuf>>(file_path: P) -> Result<Self> {
         let file_path = file_path.into();
 
         // reading the config file:
         let this = if file_path.is_file() {
-            Self::read(&file_path)?
+            Self::read(&file_path).await?
         }
         // writing the default config file:
         else {
             let mut this = Config::<T>::default();
-            this.write(file_path)?;
+            this.write(file_path).await?;
             this
         };
 
         Ok(this)
     }
 
-    /// Returns config file path
-    pub fn get_path(&self) -> &PathBuf {
+    /// Returns the config file path
+    pub fn path(&self) -> &PathBuf {
         &self.path
     }
 
@@ -58,20 +83,24 @@ where
             ext => return Err(Error::ConfigExt(ext.to_owned()).into()),
         };
 
-        Ok(Config { path, data })
+        Ok(Self {
+            path,
+            data,
+            modify: arc!(Modify::now().into()),
+        })
     }
 
     /// Reads the config file
-    pub fn read<P: Into<PathBuf>>(file_path: P) -> Result<Self> {
+    pub async fn read<P: Into<PathBuf>>(file_path: P) -> Result<Self> {
         let file_path = file_path.into();
 
         // reading the config file:
-        let contents = fs::read_to_string(&file_path)?;
+        let contents = fs::read_to_string(&file_path).await?;
         Self::parse(file_path, &contents)
     }
 
     /// Saves the config to custom file path
-    pub fn write<P: Into<PathBuf>>(&mut self, file_path: P) -> Result<()> {
+    pub async fn write<P: Into<PathBuf>>(&mut self, file_path: P) -> Result<()> {
         self.path = file_path.into();
 
         // serialize to .toml string:
@@ -84,41 +113,80 @@ where
             .as_ref()
         {
             #[cfg(any(feature = "toml-config"))]
-            "TOML" => toml::to_string_pretty(&self.data).expect("Failed to serialize TOML"),
+            "TOML" => toml::to_string_pretty(&self.data)?,
 
             #[cfg(any(feature = "json-config"))]
-            "JSON" => serde_json::to_string_pretty(&self.data).expect("Failed to serialize JSON"),
+            "JSON" => serde_json::to_string_pretty(&self.data)?,
 
             ext => return Err(Error::ConfigExt(ext.to_owned()).into()),
         };
 
         // create dir:
         if let Some(parent_dir) = self.path.parent() {
-            fs::create_dir_all(parent_dir)?;
+            fs::create_dir_all(parent_dir).await?;
         }
 
         // write file:
-        fs::write(&self.path, contents)?;
+        fs::write(&self.path, contents).await?;
 
         Ok(())
     }
 
     /// Updates the config file
-    pub fn save(&mut self) -> Result<()> {
-        self.write(self.path.clone())
+    pub async fn save(&mut self) -> Result<()> {
+        self.write(self.path.clone()).await
     }
 
-    /// Updates the struct data from config file
-    pub fn update(&mut self) -> Result<()> {
-        let cfg = Self::read(&self.path)?;
-        self.data = cfg.data;
+    /// Returns true if the data needs to be updated
+    pub async fn check(&self, millis: u64) -> Result<bool> {
+        let interval = Duration::from_millis(millis);
 
-        Ok(())
+        // check last checked time (dirty method for quick access to the latest cached state):
+        if let Some(time) = self.modify.dirty_get().checked
+            && &time.elapsed() < &interval
+        {
+            return Ok(false);
+        }
+
+        // locking state for update the instance:
+        let mut guard = self.modify.lock().await;
+
+        // check again in case the another thread is already changed instance:
+        if let Some(time) = guard.checked
+            && &time.elapsed() < &interval
+        {
+            return Ok(false);
+        }
+
+        // checking the actual file metadata:
+        let meta = fs::metadata(&self.path).await?;
+        let modified: DateTime<Utc> = meta.modified()?.into();
+
+        if let Some(&last_modified) = self.modify.dirty_get().modified.as_ref() {
+            if modified <= last_modified {
+                return Ok(false);
+            }
+        }
+
+        // update the last checked time:
+        guard.checked.replace(Instant::now());
+
+        Ok(true)
+    }
+
+    /// Updates the struct data from config file (returns true if updated)
+    pub async fn update(&mut self) -> Result<bool> {
+        // read the actual file contents:
+        let cfg = Self::read(&self.path).await?;
+        *self = cfg;
+
+        Ok(true)
     }
 }
 
-impl<T: Clone + Default + Debugging + Serialize + DeserializeOwned + Send + Sync + 'static>
-    ::std::ops::Deref for Config<T>
+impl<T> ::std::ops::Deref for Config<T>
+where
+    T: Clone + Default + Debugging + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
     type Target = T;
 
@@ -127,23 +195,26 @@ impl<T: Clone + Default + Debugging + Serialize + DeserializeOwned + Send + Sync
     }
 }
 
-impl<T: Clone + Default + Debugging + Serialize + DeserializeOwned + Send + Sync + 'static>
-    ::std::ops::DerefMut for Config<T>
+impl<T> ::std::ops::DerefMut for Config<T>
+where
+    T: Clone + Default + Debugging + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
     fn deref_mut(&mut self) -> &mut T {
         &mut self.data
     }
 }
 
-impl<T: Clone + Default + Debugging + Serialize + DeserializeOwned + Send + Sync + 'static>
-    ::std::fmt::Debug for Config<T>
+impl<T> ::std::fmt::Debug for Config<T>
+where
+    T: Clone + Default + Debugging + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         write!(f, "{:?}", &self.data)
     }
 }
 
-impl<
+impl<T> ::std::fmt::Display for Config<T>
+where
     T: Clone
         + Default
         + std::fmt::Display
@@ -153,7 +224,6 @@ impl<
         + Send
         + Sync
         + 'static,
-> ::std::fmt::Display for Config<T>
 {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         write!(f, "{}", &self.data)
@@ -165,22 +235,32 @@ impl<T: Clone + Default + Debugging + Serialize + DeserializeOwned + Eq + Send +
 {
 }
 
-impl<
-    T: Clone + Default + Debugging + Serialize + DeserializeOwned + PartialEq + Send + Sync + 'static,
-> ::std::cmp::PartialEq for Config<T>
+impl<T> ::std::cmp::PartialEq for Config<T>
+where
+    T: Clone
+        + Default
+        + Debugging
+        + Serialize
+        + DeserializeOwned
+        + PartialEq
+        + Send
+        + Sync
+        + 'static,
 {
     fn eq(&self, other: &Self) -> bool {
         &self.data == &other.data
     }
 }
 
-impl<T: Clone + Default + Debugging + Serialize + DeserializeOwned + Send + Sync + 'static>
-    ::std::convert::From<T> for Config<T>
+impl<T> ::std::convert::From<T> for Config<T>
+where
+    T: Clone + Default + Debugging + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
     fn from(value: T) -> Self {
         Self {
             path: Default::default(),
             data: value,
+            modify: arc!(Modify::now().into()),
         }
     }
 }

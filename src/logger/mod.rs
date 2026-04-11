@@ -1,105 +1,101 @@
 use crate::prelude::*;
-use chrono::Utc;
-use log::Level;
-use std::{
-    fs::{self, File},
-    io::Write,
-    path::PathBuf,
-};
 
-/// The logger instance
+use bytes::{BufMut, BytesMut};
+use chrono::{NaiveDate, Utc};
+use log::Level;
+use std::path::PathBuf;
+use tokio::fs;
+use tokio::io::{AsyncWriteExt, BufWriter};
+use tokio::sync::mpsc;
+
+/// The limited channel to protect memory
+const BUFFER_SIZE: usize = 500_000;
+
+/// The logger global instance
 static LOGGER: Lazy<Logger> = Lazy::new(|| Logger::new());
+
+/// The logger payload data
+type LogPayload = (Level, String);
 
 /// The logger
 pub struct Logger {
-    level: State<Option<Level>>,
-    path: State<Option<PathBuf>>,
-    file: State<Option<Arc<File>>>,
+    pub(super) level: State<Option<Level>>,
+    pub(super) path: State<Option<PathBuf>>,
+    pub(super) tx: Arc<mpsc::Sender<LogPayload>>,
 }
 
 impl Logger {
     /// Creates a new instance of logger
     fn new() -> Self {
+        let (tx, rx) = mpsc::channel(BUFFER_SIZE);
+
+        tokio::spawn(async move {
+            worker(rx).await;
+        });
+
         Self {
             level: State::from(Some(Level::Info)),
             path: State::from(None),
-            file: State::from(None),
+            tx: arc!(tx),
         }
     }
 
     /// Returns the current .log file path
-    pub fn get_path() -> Option<PathBuf> {
-        LOGGER.path.unsafe_get_cloned()
-    }
-
-    /// Returns a log lines of current .log file
-    pub fn read_logs() -> Result<Option<Vec<String>>> {
-        Ok(match Self::get_path() {
-            Some(path) => {
-                let contents = fs::read_to_string(path)?;
-                let lines = contents.lines().map(|s| s.to_owned()).collect::<Vec<_>>();
-
-                Some(lines)
-            }
-            _ => None,
-        })
+    pub fn path() -> Option<PathBuf> {
+        LOGGER.path.dirty_get_cloned()
     }
 
     /// Returns log level
-    pub fn get_level() -> Level {
-        LOGGER.level.unsafe_get_cloned().unwrap_or(Level::Info)
+    pub fn level() -> Level {
+        LOGGER.level.dirty_get_cloned().unwrap_or(Level::Info)
     }
 
     /// Sets minimum log level
-    pub fn set_level(level: Level) {
-        LOGGER.level.unsafe_set(Some(level));
+    pub async fn set_level(level: Level) {
+        LOGGER.level.set(Some(level)).await;
     }
 
     /// Initializes logger
-    pub fn init<P: Into<PathBuf>>(logs_dir: P, max_files: usize) -> Result<()> {
+    pub async fn init<P: Into<PathBuf>>(logs_dir: P, max_files: usize) -> Result<()> {
         let logs_dir = logs_dir.into();
 
-        // write log file:
-        let (path, file) = if max_files > 0 {
-            let file_path =
-                logs_dir.join(Utc::now().format("%Y-%m-%d_%H-%M-%S%.6f.log").to_string());
+        // create logs dir:
+        fs::create_dir_all(&logs_dir).await?;
 
-            // create logs dir:
-            fs::create_dir_all(&logs_dir)?;
-
+        // remove extra files by limit:
+        if max_files > 0 {
             // read logs dir:
-            let mut log_files: Vec<PathBuf> = fs::read_dir(&logs_dir)?
-                .filter_map(|entry| {
-                    let entry = entry.ok()?;
-                    let path = entry.path();
-                    if path.extension().map_or(false, |ext| ext == "log") {
-                        Some(path)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
+            let mut entries = fs::read_dir(&logs_dir).await?;
+            let mut files = vec![];
+            while let Some(entry) = entries.next_entry().await? {
+                let path = entry.path();
 
-            // sort log files by time:
-            log_files.sort_by_key(|path| fs::metadata(path).and_then(|m| m.created()).ok());
-
-            // remove extra files:
-            if log_files.len() > max_files {
-                for old_file in &log_files[0..log_files.len() - max_files] {
-                    let _ = fs::remove_file(old_file);
+                if path.extension().map_or(false, |ext| ext == "log") {
+                    files.push((path, entry.metadata().await.and_then(|m| m.created()).ok()));
                 }
             }
 
-            // create a new file:
-            let file = File::create(&file_path)?;
-            (Some(file_path), Some(Arc::new(file)))
-        } else {
-            (None, None)
-        };
+            // sort log files by time:
+            files.sort_by_key(|(_, time)| *time);
 
-        LOGGER.path.unsafe_set(path);
-        LOGGER.file.unsafe_set(file);
+            // remove extra files:
+            if files.len() > max_files {
+                for (old_file, _) in &files[0..files.len() - max_files] {
+                    let _ = fs::remove_file(old_file).await?;
+                }
+            }
+        }
+
+        LOGGER.path.dirty_set(Some(Self::new_path(logs_dir)));
         LOGGER.init_self()
+    }
+
+    /// Creates a new log-file path
+    fn new_path(dir: impl AsRef<Path>) -> PathBuf {
+        let dt = Utc::now().format("%Y-%m-%d_%H-%M-%S").to_string();
+        let pid = std::process::id();
+
+        dir.as_ref().join(format!("{dt}_{pid}.log"))
     }
 
     /// Helper method to initialize logger
@@ -112,55 +108,109 @@ impl Logger {
 
 impl log::Log for Logger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        metadata.level() <= Self::get_level()
+        metadata.level() <= Self::level()
     }
 
     fn log(&self, record: &log::Record) {
-        let msg = record.args().to_string();
+        if !self.enabled(record.metadata()) {
+            return;
+        }
 
-        if self.enabled(record.metadata())
-            && &msg != "NewEvents emitted without explicit RedrawEventsCleared"
-            && &msg != "RedrawEventsCleared emitted without explicit MainEventsCleared"
+        // convert arguments into a string:
+        let msg = record.args().to_string();
+        let level = record.level();
+
+        // send log into worker (drop on buffer overflow to avoid OOM):
+        self.tx.try_send((level, msg)).ok();
+    }
+
+    fn flush(&self) {}
+}
+
+/// Asynchronous worker that writes logs to the file
+async fn worker(mut rx: mpsc::Receiver<LogPayload>) {
+    let mut file = None::<BufWriter<fs::File>>;
+    let mut buffer = BytesMut::with_capacity(64 * 1024);
+
+    let mut date: Option<NaiveDate> = None;
+    let mut datetime = String::new();
+    let mut timestamp = 0i64;
+
+    while let Some((lvl, msg)) = rx.recv().await {
+        let now = Utc::now();
+        let seconds = now.timestamp();
+
+        // update datetime string only if a second has passed:
+        if seconds != timestamp {
+            datetime = now.format("%Y-%m-%dT%H:%M:%S").to_string();
+            timestamp = seconds;
+        }
+
+        // output to console is for debug only:
+        #[cfg(debug_assertions)]
         {
-            let dt = Utc::now().format("%Y-%m-%dT%H:%M:%S%.6f");
-            let prefix = match record.level() {
-                log::Level::Info => "  ",
-                log::Level::Warn => "  ",
-                log::Level::Error => " ",
-                log::Level::Debug => " ",
-                log::Level::Trace => " ",
-            };
-            let color = match record.level() {
+            let clr = match lvl {
                 log::Level::Info => "\x1b[32m",  // green
                 log::Level::Warn => "\x1b[33m",  // yellow
                 log::Level::Error => "\x1b[31m", // red
                 log::Level::Debug => "\x1b[34m", // blue
                 log::Level::Trace => "\x1b[36m", // cyan
             };
-            let reset_color = "\x1b[0m";
+            println!("{datetime}Z {clr}{lvl:<5}\x1b[0m {msg}");
+        }
 
-            // printing log to terminal:
-            println!(
-                "{dt}Z{prefix}{color}{lvl}{reset} {msg}",
-                lvl = record.level(),
-                reset = reset_color,
-                msg = record.args()
-            );
+        // if file path is not set, continue:
+        let path = LOGGER.path.dirty_get();
+        if path.is_none() {
+            continue;
+        }
 
-            // writing log to file:
-            if let Some(file) = self.file.unsafe_lock().as_mut() {
-                let _ = file.write_all(
-                    str!(
-                        "{dt}Z{prefix}{lvl} {msg}\n",
-                        lvl = record.level(),
-                        msg = record.args()
-                    )
-                    .as_bytes(),
-                );
-                let _ = file.flush();
+        // check if file needs to be changed (rotation):
+        let today = now.date_naive();
+        if date != Some(today) {
+            // discard remnants of the old file:
+            if let Some(mut old_writer) = file.take() {
+                if !buffer.is_empty() {
+                    old_writer.write_all(&buffer).await.ok();
+                    buffer.clear();
+                }
+                old_writer.flush().await.ok();
+            }
+
+            // unwrap logs directory from path:
+            if let Some(path) = path.as_ref()
+                && let Some(parent_dir) = path.parent()
+            {
+                let new_path = Logger::new_path(parent_dir);
+
+                if let Ok(f) = fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&new_path)
+                    .await
+                {
+                    file = Some(BufWriter::with_capacity(128 * 1024, f));
+                    date = Some(today);
+                }
+
+                // update path in state:
+                LOGGER.path.set(Some(new_path)).await;
+            }
+        }
+
+        // get file writer (if exists):
+        if let Some(writer) = file.as_mut() {
+            // write log to the buffer:
+            let line = format!("{datetime} {lvl:<5} {msg}\n");
+            buffer.put_slice(line.as_bytes());
+
+            // flush buffer if queue is empty OR has reached the buffer limit:
+            if rx.is_empty() || buffer.len() > 48 * 1024 {
+                if writer.write_all(&buffer).await.is_ok() {
+                    let _ = writer.flush().await;
+                }
+                buffer.clear();
             }
         }
     }
-
-    fn flush(&self) {}
 }

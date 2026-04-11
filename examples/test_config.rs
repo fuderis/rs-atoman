@@ -19,7 +19,7 @@ async fn main() -> Result<()> {
         }
     }
 
-    let mut cfg = Config::<Person>::new(".test/person.toml")?;
+    let mut cfg = Config::<Person>::new(".test/person.toml").await?;
     println!("{cfg:?}");
 
     assert_eq!(cfg.name, "Bob");

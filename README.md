@@ -95,7 +95,7 @@ impl Default for Person {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut cfg = Config::<Person>::new(".test/person.toml")?;
+    let mut cfg = Config::<Person>::new(".test/person.toml").await?;
     
     assert_eq!(cfg.name, "Bob");
     assert_eq!(cfg.age, 23);
@@ -113,7 +113,7 @@ use atoman::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    Logger::init(".logs", 20)?;
+    Logger::init(".logs", 1000).await?;
         
     info!("Hello, World!");
 
@@ -128,13 +128,16 @@ use tokio::time::{Duration, sleep};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    Logger::init(".logs", 20)?;
+    Logger::init(".logs", 1000).await?;
     info!("Logger initialized!");
-    let log_path = Logger::get_path().unwrap();
+    let log_path = Logger::path().unwrap();
+
+    info!("Tracing file: {}", log_path.display());
+    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
     // start log file tracing:
     let trace_handle = tokio::spawn(async move {
-        let mut trace = Trace::open(log_path, Duration::from_millis(50), false)
+        let trace = Trace::open(log_path, Duration::from_millis(50), false)
             .await
             .expect("Failed to open trace");
 
