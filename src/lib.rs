@@ -48,7 +48,7 @@ pub use stream::{Stream, StreamReader, StreamSender};
 #[cfg(feature = "server")]
 pub mod server;
 #[cfg(feature = "server")]
-pub use axum;
+pub use axum::{self, Json};
 #[cfg(feature = "server")]
 pub use server::{Response, Server};
 

@@ -20,13 +20,13 @@ impl Stream {
     /// Server stream in SSE format (Server-Sent Events)
     pub fn body<H, Fut>(handler: H) -> impl FuturesStream<Item = Result<Bytes>>
     where
-        H: FnOnce(StreamSender<Bytes>) -> Fut + Send + 'static,
+        H: FnOnce(Arc<StreamSender<Bytes>>) -> Fut + Send + 'static,
         Fut: Future<Output = ()> + Send + 'static,
     {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Result<Bytes>>();
 
         tokio::spawn(async move {
-            let sender = StreamSender { tx: Some(tx) };
+            let sender = arc!(StreamSender { tx: Some(tx) });
             handler(sender).await;
         });
 
