@@ -3,8 +3,11 @@ pub use reader::StreamReader;
 pub mod sender;
 pub use sender::StreamSender;
 
+pub use bytes::{self, Bytes};
+pub use futures::{self, StreamExt};
+
 use crate::prelude::*;
-use futures::{Stream as FuturesStream, StreamExt};
+use futures::Stream as FuturesStream;
 use serde::de::DeserializeOwned;
 
 /// The stream read/send manager

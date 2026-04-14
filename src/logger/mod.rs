@@ -1,8 +1,9 @@
 use crate::prelude::*;
 
+pub use log::{self, Level, debug, error, info, trace, warn};
+
 use bytes::{BufMut, BytesMut};
 use chrono::{NaiveDate, Utc};
-use log::Level;
 use std::path::PathBuf;
 use tokio::fs;
 use tokio::io::{AsyncWriteExt, BufWriter};
