@@ -1,4 +1,4 @@
-[![github]](https://github.com/fuderis/rs-atoman)&ensp;
+[![github]](https://github.com/fuderis/atoman-rs)&ensp;
 [![crates-io]](https://crates.io/crates/atoman)&ensp;
 [![docs-rs]](https://docs.rs/atoman)
 
