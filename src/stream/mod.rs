@@ -52,10 +52,11 @@ impl Stream {
     }
 
     /// Reads an external SSE format stream (Server-Sent Events)
-    pub fn read<T, S>(mut source: S) -> StreamReader<T>
+    pub fn read<T>(
+        mut source: impl FuturesStream<Item = Result<Bytes>> + Send + Unpin + 'static,
+    ) -> StreamReader<T>
     where
         T: DeserializeOwned + Send + 'static,
-        S: FuturesStream<Item = Result<Bytes>> + Send + Unpin + 'static,
     {
         let (tx, rx) = Stream::new::<T>();
 
