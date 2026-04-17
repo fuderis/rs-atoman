@@ -45,7 +45,7 @@ where
         let file_path = file_path.into();
 
         // reading the config file:
-        let this = if file_path.is_file() {
+        let this = if file_path.exists() {
             Self::read(&file_path).await?
         }
         // writing the default config file:

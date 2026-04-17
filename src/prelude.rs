@@ -11,8 +11,10 @@ pub(crate) use std::sync::{
 pub(crate) use tokio::sync::Notify;
 
 /// The dynamic error type
+#[allow(dead_code)]
 pub(crate) type DynError = Box<dyn std::error::Error + Send + Sync + 'static>;
 /// The short result alias
+#[allow(dead_code)]
 pub(crate) type Result<T> = std::result::Result<T, DynError>;
 /// The std result alias
 pub(crate) use std::result::Result as StdResult;
