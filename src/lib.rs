@@ -42,7 +42,7 @@ pub mod file;
 #[cfg(feature = "file")]
 pub use file::*;
 
-/// Initializes a static variable by 'once_cell::Lazy'
+/// Initializes static variable by 'once_cell::Lazy'.
 #[macro_export]
 macro_rules! lazy {
     ($e:expr) => {

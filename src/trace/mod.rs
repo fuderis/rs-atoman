@@ -186,7 +186,7 @@ impl MultiTrace {
         // check directory existence upfront
         if !config.dir_path.exists() {
             println!(
-                "[WARN] Directory not found for source {}: {}",
+                "Directory not found for source {}: {}",
                 config.name,
                 config.dir_path.display()
             );
@@ -199,9 +199,9 @@ impl MultiTrace {
 
                 if is_new_file {
                     println!(
-                        "[INFO] Tracing file ({}) {}",
-                        config.name,
-                        latest_file.display()
+                        "Tracing file: {} {}",
+                        config.name.bold(),
+                        latest_file.to_string_lossy().magenta()
                     );
 
                     if let Ok(file) = File::open(&latest_file).await {

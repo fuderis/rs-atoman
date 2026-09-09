@@ -22,7 +22,7 @@ pub fn config(_attr: TokenStream, item: TokenStream) -> TokenStream {
         // helper impl for the structure.
         impl #struct_name {
             /// Reads & initializes the config
-            pub async fn init<P>(file_path: P) -> ::std::result::Result<(), Box<dyn std::error::Error + Send + Sync>>
+            pub async fn init<P>(file_path: P) -> ::std::result::Result<(), Box<dyn ::std::error::Error + Send + Sync>>
             where
                 P: ::std::convert::AsRef<::std::path::Path>,
             {
@@ -52,13 +52,13 @@ pub fn config(_attr: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             /// Returns actual config file data
-            pub async fn read() -> ::std::result::Result<atoman::Config<#struct_name>, Box<dyn std::error::Error + Send + Sync>> {
+            pub async fn read() -> ::std::result::Result<atoman::Config<#struct_name>, Box<dyn ::std::error::Error + Send + Sync>> {
                 let path = #static_ident.dirty_get().path().clone();
                 atoman::Config::<#struct_name>::read(path).await
             }
 
             /// Updates config from file
-            pub async fn update() -> ::std::result::Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+            pub async fn update() -> ::std::result::Result<bool, Box<dyn ::std::error::Error + Send + Sync>> {
                 let mut cfg = #static_ident.lock().await;
 
                 if cfg.check(0).await? {
